@@ -6,11 +6,12 @@ import discord
 import os
 import asyncio
 from typing import Optional
+from utils.config import AUDIO_DIR
 
 class AudioPlayer:
     """Audio Player Class"""
     
-    def __init__(self, audio_dir: str = 'assets/audio'):
+    def __init__(self, audio_dir: str = AUDIO_DIR):
         self.audio_dir = audio_dir
         self.current_source: Optional[discord.FFmpegPCMAudio] = None
         

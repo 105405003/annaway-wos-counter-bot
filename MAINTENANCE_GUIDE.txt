@@ -1,0 +1,358 @@
+==================================================
+    專案維護與更新指南
+==================================================
+
+📚 本指南說明如何維護、更新與部署 WOS Refill Bot 專案
+
+==================================================
+1. Git 基本操作
+==================================================
+
+1.1 從 GitHub 拉取最新程式碼
+--------------------------------------------------
+# 在本機或伺服器進入專案目錄
+cd annaway-wos-counter-bot  # 或 wos-english-refill-bot
+
+# 拉取最新程式碼
+git pull origin main
+
+1.2 將改動推回 GitHub
+--------------------------------------------------
+# 查看修改狀態
+git status
+
+# 加入所有修改的檔案
+git add .
+
+# 或只加入特定檔案
+git add utils/config.py utils/audio_player.py
+
+# 提交變更（請用有意義的說明）
+git commit -m "描述修改內容"
+
+# 推送到 GitHub
+git push origin main
+
+==================================================
+2. 語音檔案管理 (AUDIO_DIR)
+==================================================
+
+2.1 語音資料夾結構
+--------------------------------------------------
+專案根目錄/
+├── assets/
+│   ├── audio/          # 中文版語音檔
+│   │   ├── 0.wav
+│   │   ├── 1p.wav
+│   │   ├── 2p.wav
+│   │   └── ... (至 100p.wav)
+│   └── audio_en/       # 英文版語音檔
+│       ├── 0.mp3
+│       ├── 1p.mp3
+│       ├── 2p.mp3
+│       └── ... (至 100p.mp3)
+
+2.2 設定語音資料夾 (.env)
+--------------------------------------------------
+# 英文版 .env
+AUDIO_DIR=assets/audio_en
+
+# 中文版 .env
+AUDIO_DIR=assets/audio
+
+2.3 生成英文語音檔
+--------------------------------------------------
+# 確保已安裝 gTTS
+pip3 install gtts
+
+# 生成英文語音檔到 assets/audio_en
+python3 tools/generate_audio.py
+
+# 檢查檔案是否生成
+ls -la assets/audio_en/
+
+==================================================
+3. 頻道設定 (TARGET_TEXT_CHANNEL_IDS)
+==================================================
+
+3.1 設定格式
+--------------------------------------------------
+# 格式：guild_id:channel_id,guild_id2:channel_id2
+
+# 單一伺服器範例（英文版）
+TARGET_TEXT_CHANNEL_IDS=1398071974692913324:1398071975460733043
+
+# 多伺服器範例
+TARGET_TEXT_CHANNEL_IDS=1398071974692913324:1398071975460733043,1354505516193419454:1354505516730757180
+
+3.2 如何取得頻道 ID
+--------------------------------------------------
+1. 在 Discord 啟用開發者模式：
+   設定 → 進階 → 開發者模式 → 開啟
+
+2. 右鍵點擊頻道 → 複製 ID
+
+3. 將 ID 填入 .env 的 TARGET_TEXT_CHANNEL_IDS
+
+==================================================
+4. 完整部署流程
+==================================================
+
+4.1 本地修改程式碼
+--------------------------------------------------
+# 1. 修改程式碼（例如：utils/config.py）
+
+# 2. 測試修改（可選）
+python3 bot_refill.py
+
+# 3. 提交到 Git
+git add .
+git commit -m "支持自訂語音資料夾、修正英文版 refill 頻道設定"
+git push origin main
+
+4.2 在 VM 上更新英文版
+--------------------------------------------------
+# 連線到 VM
+ssh anna_c@your-vm-ip
+
+# 進入英文版專案目錄
+cd ~/wos-english-refill-bot
+
+# 拉取最新程式碼
+git pull origin main
+
+# 確認 .env 設定正確
+nano .env
+# 確保有：
+# AUDIO_DIR=assets/audio_en
+# TARGET_TEXT_CHANNEL_IDS=1398071974692913324:你的頻道ID
+
+# 如果需要重新生成英文語音檔
+cd ~/wos-english-refill-bot
+python3 tools/generate_audio.py
+
+# 重啟服務
+sudo systemctl daemon-reload
+sudo systemctl restart refill-bot-en
+
+# 查看日誌
+sudo journalctl -u refill-bot-en -n 30 --no-pager
+
+4.3 在 VM 上更新中文版
+--------------------------------------------------
+# 進入中文版專案目錄
+cd ~/wos-chinese-refill-bot
+
+# 拉取最新程式碼
+git pull origin main
+
+# 確認 .env 設定正確
+nano .env
+# 確保有：
+# AUDIO_DIR=assets/audio
+# TARGET_TEXT_CHANNEL_IDS=1354505516193419454:你的頻道ID
+
+# 重啟服務
+sudo systemctl daemon-reload
+sudo systemctl restart refill-bot-zh
+
+# 查看日誌
+sudo journalctl -u refill-bot-zh -n 30 --no-pager
+
+==================================================
+5. 常見維護任務
+==================================================
+
+5.1 更新 Discord Token
+--------------------------------------------------
+# 編輯 .env
+nano ~/wos-english-refill-bot/.env
+
+# 修改 DISCORD_TOKEN=新的Token
+
+# 重啟服務
+sudo systemctl restart refill-bot-en
+
+5.2 變更 Web 面板網址
+--------------------------------------------------
+# 編輯 .env
+nano ~/wos-english-refill-bot/.env
+
+# 修改 PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1458/
+
+# 重啟服務
+sudo systemctl restart refill-bot-en
+
+5.3 新增支援的伺服器
+--------------------------------------------------
+# 編輯 .env
+nano ~/wos-english-refill-bot/.env
+
+# 在 GUILD_ALLOWLIST 加入新的 guild ID（用逗號分隔）
+GUILD_ALLOWLIST=1398071974692913324,新的guild_id
+
+# 如果新伺服器需要不同的頻道，也更新 TARGET_TEXT_CHANNEL_IDS
+TARGET_TEXT_CHANNEL_IDS=1398071974692913324:頻道1,新的guild_id:頻道2
+
+# 重啟服務
+sudo systemctl restart refill-bot-en
+
+5.4 查看服務狀態與日誌
+--------------------------------------------------
+# 查看服務狀態
+sudo systemctl status refill-bot-en
+sudo systemctl status refill-bot-zh
+
+# 查看即時日誌
+sudo journalctl -u refill-bot-en -f
+
+# 查看最近 50 行日誌
+sudo journalctl -u refill-bot-en -n 50 --no-pager
+
+# 搜尋特定關鍵字
+sudo journalctl -u refill-bot-en | grep "Synced"
+
+5.5 重啟所有服務
+--------------------------------------------------
+# 重啟英文版
+sudo systemctl restart refill-bot-en
+
+# 重啟中文版
+sudo systemctl restart refill-bot-zh
+
+# 重啟 Nginx
+sudo systemctl restart nginx
+
+# 檢查所有 refill-bot 服務
+sudo systemctl status refill-bot-*
+
+==================================================
+6. 故障排除
+==================================================
+
+6.1 Slash Commands 沒有出現
+--------------------------------------------------
+問題：在 Discord 輸入 / 看不到指令
+
+解決方法：
+1. 檢查日誌是否有 "Synced X slash commands"
+   sudo journalctl -u refill-bot-en | grep "Synced"
+
+2. 確認 .env 的 GUILD_ALLOWLIST 正確
+   cat ~/wos-english-refill-bot/.env | grep GUILD_ALLOWLIST
+
+3. 在 Discord Developer Portal 重新授權 Bot
+   - 確保勾選 applications.commands
+   - 重新生成邀請連結並授權
+
+4. 重啟服務
+   sudo systemctl restart refill-bot-en
+
+6.2 語音無法播放
+--------------------------------------------------
+問題：/counter 指令無語音
+
+解決方法：
+1. 檢查 AUDIO_DIR 設定
+   cat ~/wos-english-refill-bot/.env | grep AUDIO_DIR
+
+2. 確認語音檔案存在
+   ls -la ~/wos-english-refill-bot/assets/audio_en/
+
+3. 檢查 FFmpeg 是否安裝
+   which ffmpeg
+
+4. 重新生成語音檔
+   cd ~/wos-english-refill-bot
+   python3 tools/generate_audio.py
+
+6.3 Refill 卡片沒有出現
+--------------------------------------------------
+問題：執行 /refill 後沒有看到卡片
+
+解決方法：
+1. 檢查 TARGET_TEXT_CHANNEL_IDS 設定
+   cat ~/wos-english-refill-bot/.env | grep TARGET_TEXT_CHANNEL_IDS
+
+2. 確認格式正確（guild_id:channel_id）
+   TARGET_TEXT_CHANNEL_IDS=1398071974692913324:1398071975460733043
+
+3. 確認 Bot 有該頻道的發送訊息權限
+
+4. 查看日誌確認錯誤
+   sudo journalctl -u refill-bot-en -n 50
+
+6.4 Port 被佔用
+--------------------------------------------------
+問題：服務無法啟動，提示 port already in use
+
+解決方法：
+# 查看誰佔用了 port
+sudo netstat -tlnp | grep 8001
+
+# 終止佔用的程序
+sudo kill -9 <PID>
+
+# 或強制終止所有 bot_refill.py
+pkill -f bot_refill.py
+
+# 重啟服務
+sudo systemctl restart refill-bot-en
+
+6.5 中英文計時器混在一起
+--------------------------------------------------
+問題：兩個版本的計時器出現在錯誤的頻道
+
+解決方法：
+1. 確認使用不同的 Discord Token
+   - 英文版和中文版必須是不同的 Bot
+
+2. 確認 TARGET_TEXT_CHANNEL_IDS 不同
+   - 英文版：指向英文伺服器的頻道
+   - 中文版：指向中文伺服器的頻道
+
+3. 檢查 GUILD_ALLOWLIST 只包含對應的伺服器
+   - 英文版：GUILD_ALLOWLIST=1398071974692913324
+   - 中文版：GUILD_ALLOWLIST=1354505516193419454
+
+==================================================
+7. 版本差異對照表
+==================================================
+
+| 項目 | 英文版 | 中文版 |
+|------|--------|--------|
+| 資料夾 | ~/wos-english-refill-bot | ~/wos-chinese-refill-bot |
+| 服務名稱 | refill-bot-en.service | refill-bot-zh.service |
+| Port | 8001 | 8000 |
+| Web 路徑 | /wos/counter-bot/1458/ | /wos/counter-bot/1496/ |
+| Nginx 目錄 | /var/www/refill-bot-en/ | /var/www/refill-bot/ |
+| AUDIO_DIR | assets/audio_en | assets/audio |
+| Guild ID | 1398071974692913324 | 1354505516193419454 |
+
+==================================================
+8. 快速參考指令
+==================================================
+
+# Git 操作
+git pull origin main              # 拉取最新程式碼
+git add .                         # 加入所有變更
+git commit -m "描述"              # 提交變更
+git push origin main              # 推送到 GitHub
+
+# 服務管理
+sudo systemctl restart refill-bot-en    # 重啟英文版
+sudo systemctl status refill-bot-en     # 查看狀態
+sudo journalctl -u refill-bot-en -f     # 即時日誌
+
+# 環境設定
+nano ~/wos-english-refill-bot/.env      # 編輯設定
+cat .env | grep AUDIO_DIR                # 查看特定設定
+
+# 語音檔案
+python3 tools/generate_audio.py          # 生成語音
+ls -la assets/audio_en/                  # 列出語音檔
+
+# Nginx
+sudo nginx -t                            # 測試設定
+sudo systemctl restart nginx             # 重啟 Nginx
+

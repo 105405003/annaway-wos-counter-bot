@@ -35,3 +35,6 @@ PANEL_URL = os.getenv('PANEL_URL', 'https://tools.annaway.com.tw/wos/counter-bot
 # Port
 PORT = int(os.getenv('PORT', 8001))
 
+# Audio directory (default: assets/audio)
+# Configure in .env with AUDIO_DIR=assets/audio_en or other path
+AUDIO_DIR = os.getenv('AUDIO_DIR', 'assets/audio')

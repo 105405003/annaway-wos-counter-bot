@@ -48,6 +48,15 @@ PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1458/
 PORT=8001
 
 # ================================================
+# Audio Configuration
+# ================================================
+
+# Audio Directory (English audio files)
+# Use different audio folders for different languages
+# English: assets/audio_en, Chinese: assets/audio
+AUDIO_DIR=assets/audio_en
+
+# ================================================
 # Notes:
 # ================================================
 # 1. Replace YOUR_ENGLISH_BOT_TOKEN_HERE with actual Discord Token
@@ -55,4 +64,5 @@ PORT=8001
 # 3. If COUNTER_ROLE_IDS is empty, bot will automatically find role by name "Annaway_Counter"
 # 4. Make sure this bot uses a DIFFERENT token than the Chinese version
 # 5. English bot runs on port 8001, Chinese bot runs on port 8000
+# 6. AUDIO_DIR should point to English audio files (generate with tools/generate_audio.py)
 
