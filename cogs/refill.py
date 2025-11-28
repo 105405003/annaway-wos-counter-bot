@@ -32,11 +32,12 @@ class RefillTimer(commands.Cog):
         self.last_refill_channel_ids = {}
         
     async def get_target_channel(self, guild: discord.Guild) -> Optional[discord.TextChannel]:
-        """Get target text channel"""
+        """Get target text channel (or voice channel with text permissions)"""
         channel_id = self.target_channel_ids.get(guild.id)
         if channel_id:
             channel = guild.get_channel(channel_id)
-            if channel and isinstance(channel, discord.TextChannel):
+            # Allow voice channel or text channel, as long as bot has send_messages permission
+            if channel and channel.permissions_for(guild.me).send_messages:
                 return channel
         
         # Fallback: Use the first available text channel
