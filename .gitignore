@@ -43,11 +43,32 @@ Thumbs.db
 # Logs
 *.log
 
-# Assets (optional - uncomment if you don't want to commit assets)
-# assets/audio/*.wav
-# assets/images/*.png
+# Assets - Ignore large audio and image files
+assets/audio/*
+assets/images/*
+*.mp3
+*.wav
+*.ogg
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Compressed files
+*.zip
+*.tar.gz
+*.rar
+*.7z
 
 # Discord
 discord.log
+
+# Node modules (frontend)
+node_modules/
+package-lock.json
+
+# Frontend build artifacts
+panel/frontend/dist/
+panel/frontend/.vite/
 
 
