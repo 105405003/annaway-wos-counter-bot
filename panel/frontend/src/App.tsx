@@ -238,6 +238,25 @@ function App() {
 
       {error && <div className="error-message">{error}</div>}
 
+      {displayTimers.length > 0 ? (
+        <div className="timers-grid">
+          {displayTimers.map((timer) => (
+            <TimerCard
+              key={timer.id}
+              timer={timer}
+              onAdjust={handleAdjust}
+              onDelete={handleDelete}
+              onRestart={handleRestart}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state">
+          <p>No active timers</p>
+          <p>👇 New timers will appear here</p>
+        </div>
+      )}
+
       <div className="create-form">
         <h2>New Timer</h2>
         <form onSubmit={handleCreate}>
@@ -294,25 +313,6 @@ function App() {
           </button>
         </form>
       </div>
-
-      {displayTimers.length > 0 ? (
-        <div className="timers-grid">
-          {displayTimers.map((timer) => (
-            <TimerCard
-              key={timer.id}
-              timer={timer}
-              onAdjust={handleAdjust}
-              onDelete={handleDelete}
-              onRestart={handleRestart}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="empty-state">
-          <p>No active timers</p>
-          <p>👇 New timers will appear here</p>
-        </div>
-      )}
     </div>
   );
 }
