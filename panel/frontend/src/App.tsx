@@ -222,9 +222,11 @@ function App() {
     }
   };
 
-  // Display active and completed timers
+  // Display active and completed timers (newest first)
   const displayTimers = Array.isArray(timers)
-    ? timers.filter((t) => t.status === "active" || t.status === "completed")
+    ? timers
+        .filter((t) => t.status === "active" || t.status === "completed")
+        .reverse()
     : [];
 
   return (

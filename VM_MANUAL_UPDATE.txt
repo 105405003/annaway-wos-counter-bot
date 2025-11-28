@@ -1,0 +1,61 @@
+# ========================================
+# 手動更新方式（因為 VM 上沒有 Git）
+# ========================================
+
+# 方法 1：直接修改 VM 上的 index.css
+# ========================================
+
+cd ~/wos-english-refill-bot/panel/frontend/src
+
+# 備份原檔案
+cp index.css index.css.backup
+
+# 編輯檔案
+nano index.css
+
+# 找到第 13 行：
+#   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+# 
+# 改成：
+#   background: linear-gradient(135deg, #F97068 0%, #FA8F89 100%);
+
+# Ctrl+O 存檔，Enter，Ctrl+X 離開
+
+# 重新建置
+cd ~/wos-english-refill-bot/panel/frontend
+npm run build
+
+# 部署
+cd ~/wos-english-refill-bot
+sudo cp -r panel/frontend/dist/* /var/www/refill-bot-en/
+
+# 完成！按 Ctrl+F5 重新載入網頁
+
+
+# ========================================
+# 方法 2：從 GitHub 下載並覆蓋
+# ========================================
+
+# 下載最新版本的 ZIP
+cd ~
+wget https://github.com/105405003/annaway-wos-counter-bot/archive/refs/heads/main.zip -O wos-english-latest.zip
+
+# 解壓縮
+unzip -o wos-english-latest.zip
+
+# 覆蓋前端原始碼
+cp -r annaway-wos-counter-bot-main/panel/frontend/src/* ~/wos-english-refill-bot/panel/frontend/src/
+
+# 重新建置
+cd ~/wos-english-refill-bot/panel/frontend
+npm run build
+
+# 部署
+cd ~/wos-english-refill-bot
+sudo cp -r panel/frontend/dist/* /var/www/refill-bot-en/
+
+# 清理
+rm -rf ~/wos-english-latest.zip ~/annaway-wos-counter-bot-main
+
+# 完成！
+

@@ -1,0 +1,39 @@
+# ========================================
+# 完整部署步驟 - 更新英文版前端
+# ========================================
+
+# 1. 拉取最新程式碼
+cd ~/wos-english-refill-bot
+git pull origin main
+
+# 2. 重新建置前端
+cd panel/frontend
+npm run build
+
+# 3. 部署到 Nginx
+cd ~/wos-english-refill-bot
+sudo rm -rf /var/www/refill-bot-en/*
+sudo cp -r panel/frontend/dist/* /var/www/refill-bot-en/
+
+# 4. 檢查部署的內容（應該看到 React 版本，有 <div id="root"></div>）
+head -20 /var/www/refill-bot-en/index.html
+
+# 5. 重啟服務
+sudo systemctl restart refill-bot-en
+
+# 6. 等待 5 秒後查看日誌
+sleep 5
+sudo journalctl -u refill-bot-en -n 20 --no-pager | tail -10
+
+# 7. 測試網頁和 API
+echo "=== 測試 API ==="
+curl https://tools.annaway.com.tw/wos/counter-bot/1458/api/timers
+
+echo ""
+echo "=== 測試網頁 ==="
+curl -I https://tools.annaway.com.tw/wos/counter-bot/1458/
+
+echo ""
+echo "=== 完成！請用瀏覽器開啟：==="
+echo "https://tools.annaway.com.tw/wos/counter-bot/1458/"
+
