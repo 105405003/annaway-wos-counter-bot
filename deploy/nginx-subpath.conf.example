@@ -1,0 +1,148 @@
+# Nginx 子路徑配置範例
+# /tools/wos/refill-bot/ 反向代理設定
+#
+# 安裝方式：
+# 1. sudo cp deploy/nginx-subpath.conf.example /etc/nginx/sites-available/refill-bot
+# 2. 修改 server_name 和路徑
+# 3. sudo ln -s /etc/nginx/sites-available/refill-bot /etc/nginx/sites-enabled/
+# 4. sudo nginx -t
+# 5. sudo systemctl reload nginx
+
+server {
+    listen 80;
+    server_name yoursite.com;  # 修改為你的域名
+    
+    # 可選：自動重定向到 HTTPS
+    # return 301 https://$server_name$request_uri;
+    
+    # ============================================
+    # 前端靜態文件
+    # ============================================
+    location /tools/wos/refill-bot/ {
+        alias /var/www/refill-bot/;
+        try_files $uri $uri/ /tools/wos/refill-bot/index.html;
+        
+        # 靜態資源快取
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # 防止快取 index.html（確保更新後能立即生效）
+        location = /tools/wos/refill-bot/index.html {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            add_header Pragma "no-cache";
+            add_header Expires "0";
+        }
+    }
+    
+    # ============================================
+    # API 反向代理
+    # ============================================
+    location /tools/wos/refill-bot/api/ {
+        # 後端服務地址
+        proxy_pass http://127.0.0.1:8000/tools/wos/refill-bot/api/;
+        
+        # 基本 HTTP 標頭
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 超時設定
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        
+        # 緩衝設定
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+    
+    # ============================================
+    # WebSocket 代理
+    # ============================================
+    location /tools/wos/refill-bot/ws {
+        # 後端 WebSocket 地址
+        proxy_pass http://127.0.0.1:8000/tools/wos/refill-bot/ws;
+        
+        # WebSocket 必要標頭
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # 基本標頭
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket 超時（設定較長時間）
+        proxy_connect_timeout 7d;
+        proxy_send_timeout 7d;
+        proxy_read_timeout 7d;
+        
+        # 關閉緩衝（WebSocket 需要）
+        proxy_buffering off;
+    }
+}
+
+# ============================================
+# HTTPS 配置（推薦）
+# ============================================
+# 使用 certbot 自動設定：
+# sudo certbot --nginx -d yoursite.com
+
+# 或手動配置：
+# server {
+#     listen 443 ssl http2;
+#     server_name yoursite.com;
+#     
+#     # SSL 憑證
+#     ssl_certificate /etc/letsencrypt/live/yoursite.com/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/yoursite.com/privkey.pem;
+#     
+#     # SSL 設定
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers HIGH:!aNULL:!MD5;
+#     ssl_prefer_server_ciphers on;
+#     
+#     # ... 其他 location 設定同上
+# }
+
+# ============================================
+# 安全性增強（可選）
+# ============================================
+
+# 速率限制
+# limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+# limit_req_zone $binary_remote_addr zone=ws_limit:10m rate=5r/s;
+
+# 在 location 中啟用：
+# location /tools/wos/refill-bot/api/ {
+#     limit_req zone=api_limit burst=20 nodelay;
+#     # ... 其他設定
+# }
+
+# location /tools/wos/refill-bot/ws {
+#     limit_req zone=ws_limit burst=10 nodelay;
+#     # ... 其他設定
+# }
+
+# ============================================
+# Gzip 壓縮（提升效能）
+# ============================================
+# gzip on;
+# gzip_vary on;
+# gzip_min_length 1024;
+# gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+# ============================================
+# 日誌設定
+# ============================================
+# access_log /var/log/nginx/refill-bot-access.log;
+# error_log /var/log/nginx/refill-bot-error.log warn;
+
+
+

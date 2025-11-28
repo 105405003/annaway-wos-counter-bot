@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WOS Refill Timer Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #F97068 0%, #FA8F89 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #F97068 0%, #FA8F89 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .form-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #F97068;
+        }
+
+        .time-inputs {
+            display: flex;
+            gap: 15px;
+        }
+
+        .time-inputs .form-group {
+            flex: 1;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #F97068 0%, #FA8F89 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-warning {
+            background: white;
+            color: #F97068;
+            border: 2px solid #F97068;
+        }
+
+        .btn-warning:hover {
+            background: #F97068;
+            color: white;
+        }
+
+        .timers-section {
+            margin-bottom: 30px;
+        }
+
+        .timers-section h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .timer-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .timer-item {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .timer-item:hover {
+            border-color: #F97068;
+            box-shadow: 0 5px 15px rgba(249, 112, 104, 0.2);
+        }
+
+        .timer-item.completed {
+            background: #f8f9fa;
+            border-color: #dee2e6;
+        }
+
+        .timer-info {
+            margin-bottom: 15px;
+        }
+
+        .timer-name {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .timer-time {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .status-badge.completed {
+            background: #F97068;
+            color: white;
+        }
+
+        .timer-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        /* 手機版優化 */
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .timer-item {
+                padding: 15px;
+            }
+            
+            .timer-actions {
+                flex-wrap: wrap;
+            }
+            
+            .btn-small {
+                flex: 1;
+                min-width: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>WOS Refill Timer Panel</h1>
+            <p>補兵計時器管理面板</p>
+        </div>
+        
+        <div class="content">
+            <!-- 現有計時器放在上面 -->
+            <div class="timers-section">
+                <h2>現有計時器</h2>
+                <div id="timerList" class="timer-list">
+                    <div class="loading">載入中...</div>
+                </div>
+            </div>
+            
+            <!-- 創建新計時器放在下面 -->
+            <div class="form-section">
+                <h2>創建新計時器</h2>
+                <form id="timerForm">
+                    <div class="form-group">
+                        <label for="timerName">計時器名稱</label>
+                        <input type="text" id="timerName" placeholder="Anna、Howe" required>
+                    </div>
+                    
+                    <div class="time-inputs">
+                        <div class="form-group">
+                            <label for="minutes">分鐘</label>
+                            <input type="number" id="minutes" min="0" max="59" value="5" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="seconds">秒數</label>
+                            <input type="number" id="seconds" min="0" max="59" value="0" required>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn" id="createBtn">創建計時器</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let timers = [];
+        let timerData = {}; // 儲存計時器的初始秒數
+
+        // 載入計時器列表
+        async function loadTimers() {
+            try {
+                const response = await fetch(`${API_BASE}/timers`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (Array.isArray(data)) {
+                    timers = data;
+                    
+                    // 儲存初始秒數
+                    timers.forEach(timer => {
+                        if (!timerData[timer.id]) {
+                            timerData[timer.id] = timer.total_seconds || (timer.minutes * 60 + timer.seconds);
+                        }
+                    });
+                } else {
+                    timers = [];
+                }
+                
+                renderTimers();
+            } catch (error) {
+                console.error('載入失敗:', error);
+                document.getElementById('timerList').innerHTML = '<div class="error">載入失敗: ' + error.message + '</div>';
+            }
+        }
+
+        // 渲染計時器列表
+        function renderTimers() {
+            const timerList = document.getElementById('timerList');
+            
+            // 顯示 active 和 completed 計時器
+            const displayTimers = timers.filter(t => t.status === 'active' || t.status === 'completed');
+            
+            if (displayTimers.length === 0) {
+                timerList.innerHTML = '<div class="loading">暫無計時器</div>';
+                return;
+            }
+
+            timerList.innerHTML = displayTimers.map(timer => {
+                const minutes = timer.minutes !== undefined ? timer.minutes : 0;
+                const seconds = timer.seconds !== undefined ? timer.seconds : 0;
+                const isCompleted = timer.status === 'completed';
+                
+                let buttons = '';
+                if (isCompleted) {
+                    // 已完成：顯示重新開始和刪除按鈕
+                    buttons = `
+                        <div class="status-badge completed">🎯 已結束</div>
+                        <div class="timer-actions">
+                            <button class="btn btn-small btn-warning" onclick="restartTimer('${timer.id}')">🔄 重新開始</button>
+                            <button class="btn btn-small btn-danger" onclick="deleteTimer('${timer.id}')">刪除</button>
+                        </div>
+                    `;
+                } else {
+                    // 倒數中：顯示調整和刪除按鈕
+                    buttons = `
+                        <div class="timer-actions">
+                            <button class="btn btn-small" onclick="addTime('${timer.id}', 1)">+1s</button>
+                            <button class="btn btn-small" onclick="addTime('${timer.id}', -1)">-1s</button>
+                            <button class="btn btn-small btn-danger" onclick="deleteTimer('${timer.id}')">刪除</button>
+                        </div>
+                    `;
+                }
+                
+                return `
+                    <div class="timer-item ${isCompleted ? 'completed' : ''}">
+                        <div class="timer-info">
+                            <div class="timer-name">${timer.name || '未命名'}</div>
+                            <div class="timer-time">${minutes} 分 ${seconds} 秒</div>
+                        </div>
+                        ${buttons}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 創建計時器
+        async function createTimer(timerData) {
+            try {
+                const response = await fetch(`${API_BASE}/timers`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(timerData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '創建失敗');
+                }
+
+                showMessage('計時器創建成功！', 'success');
+                
+                await loadTimers();
+                
+                document.getElementById('timerForm').reset();
+                document.getElementById('minutes').value = 5;
+                document.getElementById('seconds').value = 0;
+                
+            } catch (error) {
+                console.error('創建失敗:', error);
+                showMessage(error.message || '創建計時器失敗', 'error');
+            }
+        }
+
+        // 重新開始計時器
+        async function restartTimer(timerId) {
+            try {
+                const response = await fetch(`${API_BASE}/timers/${timerId}/restart`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    throw new Error('重新開始失敗');
+                }
+                
+                showMessage('計時器已重新開始！', 'success');
+                await loadTimers();
+                
+            } catch (error) {
+                console.error('重新開始失敗:', error);
+                showMessage('重新開始計時器失敗', 'error');
+            }
+        }
+
+        // 調整時間
+        async function addTime(timerId, seconds) {
+            try {
+                const response = await fetch(`${API_BASE}/timers/${timerId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        adjust_seconds: seconds
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('調整失敗');
+                }
+                
+                await loadTimers();
+                
+            } catch (error) {
+                console.error('調整失敗:', error);
+                showMessage('調整時間失敗', 'error');
+            }
+        }
+
+        // 刪除計時器
+        async function deleteTimer(timerId) {
+            if (!confirm('確定要刪除這個計時器嗎？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/timers/${timerId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('刪除失敗');
+                }
+                
+                // 清除儲存的初始秒數
+                delete timerData[timerId];
+                
+                showMessage('計時器已刪除', 'success');
+                await loadTimers();
+                
+            } catch (error) {
+                console.error('刪除失敗:', error);
+                showMessage('刪除計時器失敗', 'error');
+            }
+        }
+
+        // 顯示訊息
+        function showMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            
+            const content = document.querySelector('.content');
+            content.insertBefore(messageDiv, content.firstChild);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+
+        // 表單提交
+        document.getElementById('timerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('timerName').value.trim();
+            const minutes = parseInt(document.getElementById('minutes').value);
+            const seconds = parseInt(document.getElementById('seconds').value);
+
+            if (!name) {
+                showMessage('請輸入計時器名稱', 'error');
+                return;
+            }
+
+            if (minutes === 0 && seconds === 0) {
+                showMessage('時間不能為 0', 'error');
+                return;
+            }
+
+            const createBtn = document.getElementById('createBtn');
+            createBtn.disabled = true;
+            createBtn.textContent = '創建中...';
+
+            await createTimer({ name, minutes, seconds });
+
+            createBtn.disabled = false;
+            createBtn.textContent = '創建計時器';
+        });
+
+        // 頁面載入時初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTimers();
+            setInterval(loadTimers, 2000);
+        });
+    </script>
+</body>
+</html>
+

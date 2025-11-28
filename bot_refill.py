@@ -1,0 +1,185 @@
+"""
+Discord Bot Main Program - Refill Timer Integration
+Starts both Discord Bot and FastAPI Backend
+"""
+import discord
+from discord.ext import commands
+import os
+from dotenv import load_dotenv
+import asyncio
+import logging
+import uvicorn
+from threading import Thread
+
+# Load Environment Variables
+load_dotenv()
+TOKEN = os.getenv('DISCORD_TOKEN')
+GUILD_ALLOWLIST = os.getenv('GUILD_ALLOWLIST', '').split(',') if os.getenv('GUILD_ALLOWLIST') else []
+
+# Setup Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# FFmpeg uses system installed version
+# If custom path is needed, set it here
+
+# Setup Bot Intents
+intents = discord.Intents.default()
+intents.message_content = True
+intents.voice_states = True
+intents.guilds = True
+
+# Create Bot Instance
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+# Store reference to refill cog
+refill_cog = None
+
+@bot.event
+async def on_ready():
+    logger.info(f'✅ Bot logged in as {bot.user}')
+    logger.info(f'✅ Connected to {len(bot.guilds)} guilds')
+    
+    # Sync Slash Commands (Guild specific for immediate update)
+    try:
+        for guild in bot.guilds:
+            synced = await bot.tree.sync(guild=guild)
+            logger.info(f'✅ Synced {len(synced)} slash commands for guild {guild.name}')
+    except Exception as e:
+        logger.error(f'❌ Command sync failed: {e}')
+    
+    # Set Bot Status
+    await bot.change_presence(activity=discord.Game(name="Refill Timer | /refill"))
+
+async def discord_callback(action: str, *args):
+    """
+    Discord Bot Callback Function
+    Called by FastAPI backend to update Discord messages
+    """
+    global refill_cog
+    
+    if not refill_cog:
+        return None
+    
+    try:
+        # Parse args
+        if action == "timer_create":
+            timer_id = args[0]
+            # Get timer info from backend
+            from panel.backend.main import get_timer
+            timer = get_timer(timer_id)
+            if not timer:
+                return None
+            
+            # Assume using first Guild (can be improved)
+            guild_id = bot.guilds[0].id if bot.guilds else None
+            if not guild_id:
+                return None
+            
+            return await refill_cog.handle_timer_create(
+                timer_id, guild_id, timer['name'], 
+                timer.get('total_seconds', 0)
+            )
+            
+        elif action == "timer_tick":
+            timer_id, remaining = args[0], args[1]
+            guild_id = bot.guilds[0].id if bot.guilds else None
+            if guild_id:
+                await refill_cog.handle_timer_tick(timer_id, guild_id, remaining)
+                
+        elif action == "timer_complete":
+            timer_id = args[0]
+            guild_id = bot.guilds[0].id if bot.guilds else None
+            if guild_id:
+                await refill_cog.handle_timer_complete(timer_id, guild_id)
+                
+        elif action == "timer_delete":
+            timer_id = args[0]
+            guild_id = bot.guilds[0].id if bot.guilds else None
+            if guild_id:
+                await refill_cog.handle_timer_delete(timer_id, guild_id)
+                
+    except Exception as e:
+        logger.error(f"Discord callback error: {e}")
+        return None
+
+async def load_cogs():
+    """Load all Cogs"""
+    global refill_cog
+    
+    # Load counter cog
+    try:
+        await bot.load_extension('cogs.counter')
+        logger.info('✅ Loaded counter cog')
+    except Exception as e:
+        logger.error(f'❌ Failed to load counter cog: {e}')
+    
+    # Load refill cog
+    try:
+        await bot.load_extension('cogs.refill')
+        refill_cog = bot.get_cog('RefillTimer')
+        logger.info('✅ Loaded refill cog')
+    except Exception as e:
+        logger.error(f'❌ Failed to load refill cog: {e}')
+
+async def start_bot():
+    """Start Discord Bot"""
+    async with bot:
+        await load_cogs()
+        await bot.start(TOKEN)
+
+def start_fastapi():
+    """Start FastAPI in a separate thread"""
+    from panel.backend.main import app, set_discord_callback
+    
+    # Sync wrapper for Discord callback
+    def sync_discord_callback(action: str, *args):
+        """Sync wrapper to be called by FastAPI thread"""
+        try:
+            # Run async callback in Bot's event loop
+            future = asyncio.run_coroutine_threadsafe(
+                discord_callback(action, *args), 
+                bot.loop
+            )
+            # Wait for result (max 10s)
+            result = future.result(timeout=10)
+            return result
+        except Exception as e:
+            logger.error(f"Sync callback execution failed: {e}", exc_info=True)
+            return None
+    
+    # Set Discord callback
+    set_discord_callback(sync_discord_callback)
+    
+    # Start FastAPI
+    port = int(os.getenv('PORT', 8001))
+    config = uvicorn.Config(
+        app,
+        host="0.0.0.0",
+        port=port,
+        log_level="info",
+        loop="asyncio"
+    )
+    server = uvicorn.Server(config)
+    server.run()
+
+if __name__ == '__main__':
+    # Ensure directories exist
+    os.makedirs('assets/audio', exist_ok=True)
+    os.makedirs('assets/images', exist_ok=True)
+    
+    logger.info("Starting Discord Bot and FastAPI Backend...")
+    
+    # Start FastAPI in separate thread
+    fastapi_thread = Thread(target=start_fastapi, daemon=True)
+    fastapi_thread.start()
+    logger.info("✅ FastAPI backend started in background")
+    
+    # Start Discord Bot
+    try:
+        asyncio.run(start_bot())
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")
