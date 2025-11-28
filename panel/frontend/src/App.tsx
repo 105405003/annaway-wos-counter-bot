@@ -231,7 +231,7 @@ function App() {
     <div className="container">
       <div className="header">
         <h1>WOS Refill Timer Panel</h1>
-        <p>Refill Timer Panel</p>
+        <p>補兵計時器管理面板</p>
       </div>
 
       {error && <div className="error-message">{error}</div>}
