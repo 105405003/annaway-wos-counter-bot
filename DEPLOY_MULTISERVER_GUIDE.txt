@@ -1,0 +1,172 @@
+==================================================
+    WOS Refill Bot - Multi-Server Configuration
+==================================================
+
+📋 概述
+--------------------------------------------------
+本系統現已支援多伺服器獨立運行架構，每個語言版本可在各自的 Discord 伺服器上運行而不互相干擾。
+
+🔧 架構特點
+--------------------------------------------------
+✅ 白名單機制 (GUILD_ALLOWLIST)：只服務指定的伺服器
+✅ 動態角色檢查：每個伺服器可設定不同的權限角色 ID
+✅ 獨立頻道配置：各伺服器的 /refill 卡片可顯示在不同頻道
+✅ 客製化面板網址：中英文版可使用不同的 Web 面板路徑
+✅ 管理員豁免：擁有 Administrator 權限者自動通過權限檢查
+
+📁 核心檔案說明
+--------------------------------------------------
+1. utils/config.py
+   - 統一設定管理模組
+   - 從 .env 讀取並解析伺服器對應關係
+   - 提供 GUILD_ALLOWLIST, COUNTER_ROLE_IDS, TARGET_TEXT_CHANNEL_IDS 等設定
+
+2. cogs/counter.py
+   - /counter 指令與 Start/Stop 按鈕
+   - 檢查伺服器白名單
+   - 動態讀取該伺服器的角色 ID 或以名稱搜尋
+
+3. cogs/refill.py
+   - /refill 指令與計時器卡片管理
+   - 根據 TARGET_TEXT_CHANNEL_IDS 決定卡片顯示位置
+   - 動態權限檢查
+
+4. bot_refill.py
+   - 主程式入口
+   - 只對白名單內的伺服器執行 slash command sync
+
+🚀 部署步驟（英文版範例）
+--------------------------------------------------
+
+步驟 1：上傳並解壓縮
+------------------------
+unzip -o wos_refill_bot_URL_UPDATE_FINAL.zip
+cd wos_english_count_bot
+
+步驟 2：設定 .env
+------------------------
+cp .env.example .env
+nano .env
+
+# 填入以下資訊：
+DISCORD_TOKEN=<你的英文版 Discord Bot Token>
+GUILD_ALLOWLIST=1398071974692913324
+COUNTER_ROLE_IDS=
+COUNTER_ROLE_NAME=Annaway_Counter
+TARGET_TEXT_CHANNEL_IDS=1398071974692913324:<你的頻道ID>
+PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1458/
+PORT=8001
+
+# 按 Ctrl+O 存檔，Enter 確認，Ctrl+X 離開
+
+步驟 3：部署前端
+------------------------
+cd panel/frontend
+
+# 清理舊檔案（如果有權限問題）
+sudo rm -rf node_modules package-lock.json
+npm cache clean --force
+
+# 安裝依賴並建置
+npm install
+npm run build
+
+# 確認建置成功
+ls -la dist/
+
+# 部署到 Nginx
+cd ~/wos_english_count_bot
+sudo rm -rf /var/www/refill-bot-en/*
+sudo cp -r panel/frontend/dist/* /var/www/refill-bot-en/
+
+步驟 4：更新 Nginx 設定
+------------------------
+# 編輯 Nginx 設定檔
+sudo nano /etc/nginx/sites-available/refill-bot
+
+# 確保有以下內容：
+location /wos/counter-bot/1458/ {
+    alias /var/www/refill-bot-en/;
+    try_files $uri $uri/ /index.html;
+    index index.html;
+}
+
+location /wos/counter-bot/1458/api/ {
+    proxy_pass http://127.0.0.1:8001/api/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+
+location /wos/counter-bot/1458/ws {
+    proxy_pass http://127.0.0.1:8001/ws;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+}
+
+# 測試並重啟 Nginx
+sudo nginx -t
+sudo systemctl restart nginx
+
+步驟 5：重啟 Bot 服務
+------------------------
+sudo systemctl restart refill-bot-en
+
+# 等待服務啟動
+sleep 5
+
+# 查看日誌確認
+sudo journalctl -u refill-bot-en -n 30 --no-pager
+
+# 應該看到：
+# ✅ Bot logged in as ...
+# ✅ Synced X slash commands globally
+# ✅ Synced X slash commands for guild ...
+
+📝 中文版部署（參考）
+--------------------------------------------------
+如果您要部署中文版，使用相同的步驟，但 .env 設定改為：
+
+DISCORD_TOKEN=<中文版 Token>
+GUILD_ALLOWLIST=1354505516193419454
+TARGET_TEXT_CHANNEL_IDS=1354505516193419454:<中文版頻道ID>
+PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1496/
+PORT=8000
+
+前端也需要修改 vite.config.ts 的 base 為 '/wos/counter-bot/1496/'
+
+🔍 驗證清單
+--------------------------------------------------
+✅ 訪問 Web 面板：https://tools.annaway.com.tw/wos/counter-bot/1458/
+✅ 執行 /counter 指令：應該能看到操作面板
+✅ 執行 /refill 指令：應該顯示 Web 面板連結
+✅ 測試 Start/Stop 按鈕：確認權限檢查正常
+✅ 確認計時器卡片出現在正確頻道
+
+⚠️ 常見問題
+--------------------------------------------------
+Q: Slash commands 看不到？
+A: 1. 確認 GUILD_ALLOWLIST 設定正確
+   2. 在 Discord Developer Portal 重新授權機器人
+   3. 確保勾選 applications.commands 權限
+
+Q: 權限錯誤 "Required role not found"？
+A: 1. 確認伺服器中有 "Annaway_Counter" 角色
+   2. 或在 COUNTER_ROLE_IDS 設定該伺服器的角色 ID
+
+Q: Web 面板 403 錯誤？
+A: 1. 確認 /var/www/refill-bot-en/ 有檔案
+   2. 檢查 Nginx 設定中的 alias 路徑
+   3. 執行 sudo systemctl restart nginx
+
+Q: 中英文計時器混在一起？
+A: 確保兩個版本使用 **不同的 Discord Token**
+   這是最重要的隔離機制！
+
+📞 技術支援
+--------------------------------------------------
+遇到問題請提供：
+1. sudo journalctl -u refill-bot-en -n 50 --no-pager
+2. sudo nginx -t 的輸出
+3. .env 檔案內容（隱藏 Token）
+

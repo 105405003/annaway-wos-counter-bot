@@ -1,0 +1,190 @@
+==================================================
+    中文版部署完整指南
+==================================================
+
+📋 前提條件
+--------------------------------------------------
+1. 已經部署好英文版（使用 wos_refill_bot_MULTISERVER_FINAL.zip）
+2. 擁有獨立的中文版 Discord Bot Token
+3. 中文版伺服器 ID: 1354505516193419454
+
+🔧 步驟 1：修改前端路徑為 1496
+--------------------------------------------------
+中文版需要修改前端的 base path。
+
+# 在本地電腦操作（修改專案）
+cd F:\AnnawayProjects\wos_english_count_bot
+
+# 編輯 vite.config.ts
+nano panel/frontend/vite.config.ts
+
+# 將 base 改為：
+base: '/wos/counter-bot/1496/',
+
+# 同時確認 proxy 指向 port 8000：
+proxy: {
+  '/api': {
+    target: 'http://localhost:8000',  # 中文版用 8000
+    changeOrigin: true
+  },
+  '/ws': {
+    target: 'ws://localhost:8000',    # 中文版用 8000
+    ws: true,
+    changeOrigin: true
+  }
+}
+
+📦 步驟 2：打包中文版
+--------------------------------------------------
+# 在本地電腦操作
+cd F:\AnnawayProjects\wos_english_count_bot
+Compress-Archive -Path "." -DestinationPath "wos_refill_bot_CHINESE_1496.zip" -Force
+
+🚀 步驟 3：部署到 VM
+--------------------------------------------------
+# 在 VM 上操作
+
+# 1. 上傳並解壓縮中文版
+cd ~
+unzip -o wos_refill_bot_CHINESE_1496.zip -d wos-chinese-refill-bot
+cd wos-chinese-refill-bot
+
+# 2. 建立中文版 .env
+nano .env
+
+# 填入以下內容：
+DISCORD_TOKEN=你的中文版Token
+GUILD_ALLOWLIST=1354505516193419454
+COUNTER_ROLE_IDS=
+COUNTER_ROLE_NAME=Annaway_Counter
+TARGET_TEXT_CHANNEL_IDS=1354505516193419454:你的中文頻道ID
+PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1496/
+PORT=8000
+
+# Ctrl+O 存檔, Enter 確認, Ctrl+X 離開
+
+# 3. 安裝 Python 依賴
+pip3 install -r requirements_refill.txt
+
+# 4. 建置前端
+cd panel/frontend
+sudo rm -rf node_modules package-lock.json
+npm cache clean --force
+npm install
+npm run build
+
+# 確認 dist 資料夾生成
+ls -la dist/
+
+# 5. 部署到 Nginx（中文版用 /var/www/refill-bot/）
+cd ~/wos-chinese-refill-bot
+sudo rm -rf /var/www/refill-bot/*
+sudo cp -r panel/frontend/dist/* /var/www/refill-bot/
+
+# 6. 確認 Nginx 設定包含 1496 路徑
+sudo nano /etc/nginx/sites-available/refill-bot
+
+# 應該要有以下區塊：
+location /wos/counter-bot/1496/ {
+    alias /var/www/refill-bot/;
+    try_files $uri $uri/ /index.html;
+    index index.html;
+}
+
+location /wos/counter-bot/1496/api/ {
+    proxy_pass http://127.0.0.1:8000/api/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+
+location /wos/counter-bot/1496/ws {
+    proxy_pass http://127.0.0.1:8000/ws;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+}
+
+# 測試並重啟 Nginx
+sudo nginx -t
+sudo systemctl restart nginx
+
+# 7. 建立 systemd 服務（中文版）
+sudo nano /etc/systemd/system/refill-bot-zh.service
+
+# 填入以下內容：
+[Unit]
+Description=WOS Refill Timer Bot (Chinese Version)
+After=network.target
+
+[Service]
+Type=simple
+User=anna_c
+WorkingDirectory=/home/anna_c/wos-chinese-refill-bot
+ExecStart=/usr/bin/python3 bot_refill.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+# Ctrl+O 存檔, Enter 確認, Ctrl+X 離開
+
+# 8. 啟動中文版服務
+sudo systemctl daemon-reload
+sudo systemctl enable refill-bot-zh
+sudo systemctl start refill-bot-zh
+
+# 9. 查看服務狀態
+sudo systemctl status refill-bot-zh
+sudo journalctl -u refill-bot-zh -n 30 --no-pager
+
+✅ 步驟 4：驗證部署
+--------------------------------------------------
+# 1. 檢查兩個服務都在運行
+sudo systemctl status refill-bot-en  # 英文版 (port 8001)
+sudo systemctl status refill-bot-zh  # 中文版 (port 8000)
+
+# 2. 測試 Web 面板
+# 英文版：https://tools.annaway.com.tw/wos/counter-bot/1458/
+# 中文版：https://tools.annaway.com.tw/wos/counter-bot/1496/
+
+# 3. 在 Discord 測試指令
+# 英文伺服器：/counter, /refill
+# 中文伺服器：/counter, /refill
+
+# 4. 確認計時器不會混在一起
+# 中英文版應該各自在各自的頻道顯示
+
+📊 服務管理指令
+--------------------------------------------------
+# 英文版
+sudo systemctl restart refill-bot-en
+sudo journalctl -u refill-bot-en -n 50 --no-pager
+
+# 中文版
+sudo systemctl restart refill-bot-zh
+sudo journalctl -u refill-bot-zh -n 50 --no-pager
+
+# 同時查看兩個服務
+sudo systemctl status refill-bot-*
+
+⚠️ 重要提醒
+--------------------------------------------------
+1. ✅ 中英文版必須使用不同的 Discord Bot Token
+2. ✅ 中文版 port 8000，英文版 port 8001
+3. ✅ 中文版路徑 /1496/，英文版路徑 /1458/
+4. ✅ TARGET_TEXT_CHANNEL_IDS 要填入各自伺服器的頻道 ID
+5. ✅ 兩個版本的專案資料夾要分開（wos-chinese-refill-bot 和 wos-english-refill-bot）
+
+🔧 如果遇到問題
+--------------------------------------------------
+# 檢查 port 是否被佔用
+sudo netstat -tlnp | grep -E "8000|8001"
+
+# 檢查 Nginx 設定
+sudo nginx -t
+
+# 查看完整日誌
+sudo journalctl -u refill-bot-zh -f  # 即時查看中文版日誌
+sudo journalctl -u refill-bot-en -f  # 即時查看英文版日誌
+

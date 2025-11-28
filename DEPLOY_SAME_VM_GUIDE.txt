@@ -1,0 +1,412 @@
+==================================================
+    同一台 VM 部署中英文雙版本 - 完整指南
+==================================================
+
+🎯 目標
+--------------------------------------------------
+在同一台 VM 上運行兩個獨立的 Discord Bot：
+- 英文版：使用 port 8001，路徑 /1458/
+- 中文版：使用 port 8000，路徑 /1496/
+
+📂 VM 上的資料夾結構
+--------------------------------------------------
+/home/anna_c/
+├── wos-english-refill-bot/     # 英文版專案資料夾
+│   ├── bot_refill.py
+│   ├── .env                    # 英文版設定（Token, port 8001）
+│   ├── panel/
+│   │   └── frontend/
+│   │       └── dist/           # 建置後的前端檔案
+│   └── ...
+│
+└── wos-chinese-refill-bot/     # 中文版專案資料夾
+    ├── bot_refill.py
+    ├── .env                    # 中文版設定（Token, port 8000）
+    ├── panel/
+    │   └── frontend/
+    │       └── dist/           # 建置後的前端檔案
+    └── ...
+
+/var/www/
+├── refill-bot-en/              # 英文版前端靜態檔案
+│   ├── index.html
+│   └── assets/
+│
+└── refill-bot/                 # 中文版前端靜態檔案
+    ├── index.html
+    └── assets/
+
+/etc/systemd/system/
+├── refill-bot-en.service       # 英文版服務
+└── refill-bot-zh.service       # 中文版服務
+
+==================================================
+第一步：部署英文版（1458）
+==================================================
+
+1. 上傳 ZIP 檔到 VM
+--------------------------------------------------
+# 在本地電腦（Windows）透過 GCP SSH 網頁上傳
+# 或使用 SCP/SFTP 上傳 wos_refill_bot_MULTISERVER_FINAL.zip
+
+2. 解壓縮到英文版資料夾
+--------------------------------------------------
+cd ~
+unzip -o wos_refill_bot_MULTISERVER_FINAL.zip -d wos-english-refill-bot
+
+3. 進入英文版資料夾
+--------------------------------------------------
+cd ~/wos-english-refill-bot
+ls
+# 應該看到：bot_refill.py, cogs/, panel/, utils/, 等檔案
+
+4. 建立英文版 .env
+--------------------------------------------------
+nano .env
+
+# 複製以下內容並修改：
+DISCORD_TOKEN=你的英文版Discord_Bot_Token
+GUILD_ALLOWLIST=1398071974692913324
+COUNTER_ROLE_IDS=
+COUNTER_ROLE_NAME=Annaway_Counter
+TARGET_TEXT_CHANNEL_IDS=1398071974692913324:你要顯示refill卡片的頻道ID
+PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1458/
+PORT=8001
+
+# 按 Ctrl+O 存檔，Enter 確認，Ctrl+X 離開
+
+5. 安裝 Python 依賴（如果還沒裝過）
+--------------------------------------------------
+pip3 install -r requirements_refill.txt
+
+6. 建置英文版前端
+--------------------------------------------------
+cd ~/wos-english-refill-bot/panel/frontend
+
+# 清理舊檔案（避免權限問題）
+sudo rm -rf node_modules package-lock.json
+npm cache clean --force
+
+# 安裝並建置
+npm install
+npm run build
+
+# 確認建置成功（應該看到 dist 資料夾）
+ls -la dist/
+
+7. 部署英文版前端到 Nginx
+--------------------------------------------------
+cd ~/wos-english-refill-bot
+sudo mkdir -p /var/www/refill-bot-en
+sudo rm -rf /var/www/refill-bot-en/*
+sudo cp -r panel/frontend/dist/* /var/www/refill-bot-en/
+
+# 確認檔案已複製
+ls -la /var/www/refill-bot-en/
+
+8. 建立或更新 systemd 服務（英文版）
+--------------------------------------------------
+sudo nano /etc/systemd/system/refill-bot-en.service
+
+# 確保內容如下：
+[Unit]
+Description=WOS Refill Timer Bot (English Version)
+After=network.target
+
+[Service]
+Type=simple
+User=anna_c
+WorkingDirectory=/home/anna_c/wos-english-refill-bot
+ExecStart=/usr/bin/python3 bot_refill.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+# Ctrl+O 存檔，Enter 確認，Ctrl+X 離開
+
+9. 啟動英文版服務
+--------------------------------------------------
+sudo systemctl daemon-reload
+sudo systemctl enable refill-bot-en
+sudo systemctl restart refill-bot-en
+
+# 查看狀態
+sudo systemctl status refill-bot-en
+
+# 查看日誌
+sudo journalctl -u refill-bot-en -n 30 --no-pager
+
+==================================================
+第二步：部署中文版（1496）
+==================================================
+
+1. 在本地修改 vite.config.ts（準備中文版）
+--------------------------------------------------
+# 在你的 Windows 電腦上
+# 編輯 F:\AnnawayProjects\wos_english_count_bot\panel\frontend\vite.config.ts
+
+找到：
+  base: '/wos/counter-bot/1458/',
+
+改成：
+  base: '/wos/counter-bot/1496/',
+
+找到：
+  proxy: {
+    '/api': {
+      target: 'http://localhost:8001',
+
+改成：
+      target: 'http://localhost:8000',
+
+找到：
+    '/ws': {
+      target: 'ws://localhost:8001',
+
+改成：
+      target: 'ws://localhost:8000',
+
+存檔！
+
+2. 打包中文版
+--------------------------------------------------
+# 在 Windows PowerShell
+cd F:\AnnawayProjects\wos_english_count_bot
+Compress-Archive -Path * -DestinationPath wos_refill_bot_CHINESE_1496.zip -Force
+
+# 這會產生 wos_refill_bot_CHINESE_1496.zip
+
+3. 上傳中文版 ZIP 到 VM
+--------------------------------------------------
+# 透過 GCP SSH 網頁介面上傳 wos_refill_bot_CHINESE_1496.zip
+
+4. 在 VM 上解壓縮中文版
+--------------------------------------------------
+cd ~
+unzip -o wos_refill_bot_CHINESE_1496.zip -d wos-chinese-refill-bot
+
+5. 建立中文版 .env
+--------------------------------------------------
+cd ~/wos-chinese-refill-bot
+nano .env
+
+# 複製以下內容並修改：
+DISCORD_TOKEN=你的中文版Discord_Bot_Token
+GUILD_ALLOWLIST=1354505516193419454
+COUNTER_ROLE_IDS=
+COUNTER_ROLE_NAME=Annaway_Counter
+TARGET_TEXT_CHANNEL_IDS=1354505516193419454:你要顯示refill卡片的頻道ID
+PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1496/
+PORT=8000
+
+# Ctrl+O 存檔，Enter 確認，Ctrl+X 離開
+
+6. 建置中文版前端
+--------------------------------------------------
+cd ~/wos-chinese-refill-bot/panel/frontend
+
+# 清理並建置
+sudo rm -rf node_modules package-lock.json
+npm cache clean --force
+npm install
+npm run build
+
+# 確認建置成功
+ls -la dist/
+
+7. 部署中文版前端到 Nginx
+--------------------------------------------------
+cd ~/wos-chinese-refill-bot
+sudo mkdir -p /var/www/refill-bot
+sudo rm -rf /var/www/refill-bot/*
+sudo cp -r panel/frontend/dist/* /var/www/refill-bot/
+
+# 確認檔案已複製
+ls -la /var/www/refill-bot/
+
+8. 建立 systemd 服務（中文版）
+--------------------------------------------------
+sudo nano /etc/systemd/system/refill-bot-zh.service
+
+# 內容：
+[Unit]
+Description=WOS Refill Timer Bot (Chinese Version)
+After=network.target
+
+[Service]
+Type=simple
+User=anna_c
+WorkingDirectory=/home/anna_c/wos-chinese-refill-bot
+ExecStart=/usr/bin/python3 bot_refill.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+# Ctrl+O 存檔，Enter 確認，Ctrl+X 離開
+
+9. 啟動中文版服務
+--------------------------------------------------
+sudo systemctl daemon-reload
+sudo systemctl enable refill-bot-zh
+sudo systemctl start refill-bot-zh
+
+# 查看狀態
+sudo systemctl status refill-bot-zh
+
+# 查看日誌
+sudo journalctl -u refill-bot-zh -n 30 --no-pager
+
+==================================================
+第三步：設定 Nginx（同時支援兩個版本）
+==================================================
+
+1. 編輯 Nginx 設定
+--------------------------------------------------
+sudo nano /etc/nginx/sites-available/refill-bot
+
+# 確保包含以下完整內容：
+server {
+    listen 80;
+    server_name tools.annaway.com.tw;
+
+    # ==========================================
+    # English Version (1458)
+    # ==========================================
+    
+    location /wos/counter-bot/1458/ {
+        alias /var/www/refill-bot-en/;
+        try_files $uri $uri/ /index.html;
+        index index.html;
+    }
+
+    location /wos/counter-bot/1458/api/ {
+        proxy_pass http://127.0.0.1:8001/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /wos/counter-bot/1458/ws {
+        proxy_pass http://127.0.0.1:8001/ws;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # ==========================================
+    # Chinese Version (1496)
+    # ==========================================
+    
+    location /wos/counter-bot/1496/ {
+        alias /var/www/refill-bot/;
+        try_files $uri $uri/ /index.html;
+        index index.html;
+    }
+
+    location /wos/counter-bot/1496/api/ {
+        proxy_pass http://127.0.0.1:8000/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /wos/counter-bot/1496/ws {
+        proxy_pass http://127.0.0.1:8000/ws;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+# Ctrl+O 存檔，Enter 確認，Ctrl+X 離開
+
+2. 測試並重啟 Nginx
+--------------------------------------------------
+sudo nginx -t
+sudo systemctl restart nginx
+
+==================================================
+第四步：驗證部署
+==================================================
+
+1. 檢查兩個服務都在運行
+--------------------------------------------------
+sudo systemctl status refill-bot-en
+sudo systemctl status refill-bot-zh
+
+# 都應該顯示 "active (running)"
+
+2. 檢查 Port 佔用
+--------------------------------------------------
+sudo netstat -tlnp | grep -E "8000|8001"
+
+# 應該看到：
+# 8000 被 refill-bot-zh 使用
+# 8001 被 refill-bot-en 使用
+
+3. 測試 Web 面板
+--------------------------------------------------
+# 在瀏覽器打開：
+# 英文版：https://tools.annaway.com.tw/wos/counter-bot/1458/
+# 中文版：https://tools.annaway.com.tw/wos/counter-bot/1496/
+
+4. 測試 Discord 指令
+--------------------------------------------------
+# 在英文 Discord 伺服器輸入：/counter 或 /refill
+# 在中文 Discord 伺服器輸入：/counter 或 /refill
+
+# 兩邊應該都能正常運作，且計時器不會混在一起
+
+==================================================
+日常管理指令
+==================================================
+
+# 重啟服務
+sudo systemctl restart refill-bot-en   # 重啟英文版
+sudo systemctl restart refill-bot-zh   # 重啟中文版
+
+# 查看日誌
+sudo journalctl -u refill-bot-en -f    # 即時查看英文版日誌
+sudo journalctl -u refill-bot-zh -f    # 即時查看中文版日誌
+
+# 停止服務
+sudo systemctl stop refill-bot-en
+sudo systemctl stop refill-bot-zh
+
+# 查看所有 refill-bot 相關服務
+sudo systemctl status refill-bot-*
+
+==================================================
+故障排除
+==================================================
+
+Q: Port 被佔用怎麼辦？
+A: sudo netstat -tlnp | grep 8001
+   找到 PID 後：sudo kill -9 <PID>
+   然後重啟服務
+
+Q: Nginx 403 錯誤？
+A: 檢查檔案權限：
+   ls -la /var/www/refill-bot-en/
+   ls -la /var/www/refill-bot/
+   確保有 index.html 和 assets 資料夾
+
+Q: Discord 指令看不到？
+A: 1. 檢查 .env 的 GUILD_ALLOWLIST 是否正確
+   2. 查看日誌確認有 "Synced X slash commands"
+   3. 在 Discord Developer Portal 重新授權 Bot
+
+Q: 計時器混在一起？
+A: 確認兩個版本使用 **不同的 Discord Token**
+   這是最重要的隔離機制！
+

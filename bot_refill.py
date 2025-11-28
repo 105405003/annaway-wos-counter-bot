@@ -45,12 +45,17 @@ async def on_ready():
     
     # Sync Slash Commands (Guild specific for immediate update)
     try:
+        # First sync globally to ensure commands are registered
+        global_synced = await bot.tree.sync()
+        logger.info(f'✅ Synced {len(global_synced)} slash commands globally')
+        
+        # Then sync to specific guilds in allowlist for immediate availability
         for guild in bot.guilds:
             if guild.id in GUILD_ALLOWLIST:
-                synced = await bot.tree.sync(guild=guild)
-                logger.info(f'✅ Synced {len(synced)} slash commands for guild {guild.name}')
+                guild_synced = await bot.tree.sync(guild=discord.Object(id=guild.id))
+                logger.info(f'✅ Synced {len(guild_synced)} slash commands for guild {guild.name}')
     except Exception as e:
-        logger.error(f'❌ Command sync failed: {e}')
+        logger.error(f'❌ Command sync failed: {e}', exc_info=True)
     
     # Set Bot Status
     await bot.change_presence(activity=discord.Game(name="Refill Timer | /refill"))

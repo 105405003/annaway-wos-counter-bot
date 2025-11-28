@@ -1,0 +1,58 @@
+# ================================================
+# WOS Refill Bot - Chinese Version Configuration
+# ================================================
+
+# Discord Bot Token (REQUIRED)
+# Get this from Discord Developer Portal
+DISCORD_TOKEN=YOUR_CHINESE_BOT_TOKEN_HERE
+
+# ================================================
+# Server Configuration
+# ================================================
+
+# Allowed Guild IDs (Whitelist) - Chinese Server Only
+# Format: guild_id1,guild_id2,...
+GUILD_ALLOWLIST=1354505516193419454
+
+# ================================================
+# Role Configuration
+# ================================================
+
+# Guild ID to Role ID mapping (Optional)
+# Format: guild_id:role_id,guild_id2:role_id2
+# If NOT set, bot will search by COUNTER_ROLE_NAME
+# Example: COUNTER_ROLE_IDS=1354505516193419454:987654321098765432
+COUNTER_ROLE_IDS=
+
+# Fallback Role Name (Used when COUNTER_ROLE_IDS is empty)
+COUNTER_ROLE_NAME=Annaway_Counter
+
+# ================================================
+# Channel Configuration
+# ================================================
+
+# Guild ID to Target Text Channel ID mapping
+# Format: guild_id:channel_id,guild_id2:channel_id2
+# This is where /refill cards will be posted
+# Example: TARGET_TEXT_CHANNEL_IDS=1354505516193419454:1234567890123456789
+TARGET_TEXT_CHANNEL_IDS=1354505516193419454:YOUR_CHANNEL_ID_HERE
+
+# ================================================
+# Web Panel Configuration
+# ================================================
+
+# Web Panel URL (Chinese Version)
+PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1496/
+
+# FastAPI Backend Port
+PORT=8000
+
+# ================================================
+# Notes:
+# ================================================
+# 1. Replace YOUR_CHINESE_BOT_TOKEN_HERE with actual Discord Token
+# 2. Replace YOUR_CHANNEL_ID_HERE with the channel ID where you want refill cards
+# 3. If COUNTER_ROLE_IDS is empty, bot will automatically find role by name "Annaway_Counter"
+# 4. Make sure this bot uses a DIFFERENT token than the English version
+# 5. Chinese bot runs on port 8000, English bot runs on port 8001
+
