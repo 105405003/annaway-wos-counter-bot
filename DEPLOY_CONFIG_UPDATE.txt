@@ -1,0 +1,77 @@
+==================================================
+        WOS Refill Bot - Configuration Update (v2)
+==================================================
+
+本更新包含以下變更：
+1. 英文版前端路徑變更為 /wos/counter-bot/1458/
+2. 支援 Nginx 多版本配置 (中文版 1496 + 英文版 1458)
+3. 權限設定優化 (預設使用 Annaway_Counter 角色名稱)
+
+0. 預備動作 (非常重要！)
+--------------------------------------------------
+請先確認您在正確的專案資料夾內。
+執行 `ls` 查看，您應該要看到 `bot_refill.py` 和 `panel` 資料夾。
+
+# 常見的資料夾名稱 (請依照您實際的狀況進入)
+cd ~/wos_english_count_bot
+# 或
+cd ~/wos-english-refill-bot
+
+# 確認現在位置
+pwd
+ls -F
+# 若看到 panel/ 則表示位置正確
+
+1. 更新 Nginx 設定 (關鍵！)
+--------------------------------------------------
+我們需要更新 Nginx 設定以支援兩個不同版本的路徑。
+
+# 複製新的設定檔
+sudo cp deploy/nginx-multibot.conf /etc/nginx/sites-available/refill-bot
+
+# 建立連結 (如果尚未建立)
+sudo ln -s /etc/nginx/sites-available/refill-bot /etc/nginx/sites-enabled/
+
+# 檢查設定並重啟 Nginx
+sudo nginx -t
+sudo systemctl restart nginx
+
+2. 修改 .env 設定檔
+--------------------------------------------------
+# 使用 nano 編輯器開啟設定檔
+nano .env
+
+# --- 在 nano 編輯器中的操作 ---
+# 1. 使用鍵盤上下左右鍵移動游標
+# 2. 找到 PANEL_URL 修改為 https://tools.annaway.com.tw/wos/counter-bot/1458/
+# 3. 找到或新增 GUILD_ALLOWLIST=1398071974692913324
+# 4. 按 Ctrl + O (存檔)，然後按 Enter 確認
+# 5. 按 Ctrl + X (離開編輯器)
+# ---------------------------
+
+3. 重新部署英文版前端
+--------------------------------------------------
+因為網址變更，需要重新建置並部署前端檔案。
+(本 ZIP 包中的 dist 資料夾已經是針對 /1458/ 路徑建置的版本)
+
+# 務必確認您在專案根目錄 (有 panel 資料夾的地方)
+cd panel/frontend
+npm install
+npm run build
+cd ../..
+
+# 部署到 Nginx 目錄
+sudo rm -rf /var/www/refill-bot-en/*
+sudo cp -r panel/frontend/dist/* /var/www/refill-bot-en/
+
+4. 重啟 Python 服務
+--------------------------------------------------
+sudo systemctl restart refill-bot-en
+
+5. 關於中文版 (1496)
+--------------------------------------------------
+若您希望中文版網址也變更為 /wos/counter-bot/1496/，您需要：
+1. 在中文版專案中修改 vite.config.ts 的 base 為 '/wos/counter-bot/1496/'
+2. 重新 build 前端並部署到 /var/www/refill-bot/
+3. 修改中文版 .env 的 PANEL_URL
+4. Nginx 設定檔 (nginx-multibot.conf) 已經預先包含了 1496 的設定，只要中文版前端部署好即可生效。

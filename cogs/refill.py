@@ -10,6 +10,13 @@ import os
 from typing import Optional
 from utils.sessions import SessionManager
 from utils.discord_cards import create_refill_card, update_refill_card, delete_refill_card
+from utils.config import (
+    GUILD_ALLOWLIST,
+    COUNTER_ROLE_IDS,
+    COUNTER_ROLE_NAME,
+    TARGET_TEXT_CHANNEL_IDS,
+    PANEL_URL
+)
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -20,19 +27,17 @@ class RefillTimer(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.session_manager = SessionManager()
-        self.target_channel_id = os.getenv('TARGET_TEXT_CHANNEL_ID')
+        self.target_channel_ids = TARGET_TEXT_CHANNEL_IDS
         # Store the last channel ID where /refill was used for each Guild
         self.last_refill_channel_ids = {}
         
     async def get_target_channel(self, guild: discord.Guild) -> Optional[discord.TextChannel]:
         """Get target text channel"""
-        if self.target_channel_id:
-            try:
-                channel = guild.get_channel(int(self.target_channel_id))
-                if channel and isinstance(channel, discord.TextChannel):
-                    return channel
-            except:
-                pass
+        channel_id = self.target_channel_ids.get(guild.id)
+        if channel_id:
+            channel = guild.get_channel(channel_id)
+            if channel and isinstance(channel, discord.TextChannel):
+                return channel
         
         # Fallback: Use the first available text channel
         for channel in guild.text_channels:
@@ -45,14 +50,31 @@ class RefillTimer(commands.Cog):
     async def refill_panel(self, interaction: discord.Interaction):
         """Show Refill Timer Info"""
         # Check permissions
-        required_role = interaction.guild.get_role(1425481189443244123)
-        if required_role and required_role not in interaction.user.roles:
-            if not interaction.user.guild_permissions.administrator:
-                await interaction.response.send_message(
-                    "❌ You don't have permission to use this command!",
-                    ephemeral=True
-                )
-                return
+        if interaction.guild_id not in GUILD_ALLOWLIST:
+            await interaction.response.send_message(
+                "❌ This bot is not configured for this server.",
+                ephemeral=True
+            )
+            return
+
+        # Dynamic Role Check
+        role_id = COUNTER_ROLE_IDS.get(interaction.guild_id)
+        required_role = None
+        if role_id:
+            required_role = interaction.guild.get_role(role_id)
+        
+        if required_role is None:
+            required_role = next(
+                (r for r in interaction.guild.roles if r.name == COUNTER_ROLE_NAME),
+                None
+            )
+            
+        if required_role and required_role not in interaction.user.roles and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "❌ You don't have permission to use this command!",
+                ephemeral=True
+            )
+            return
         
         # Record the channel ID used for /refill in this Guild (supports Text and Voice channels)
         if isinstance(interaction.channel, (discord.TextChannel, discord.VoiceChannel)):
@@ -71,11 +93,10 @@ class RefillTimer(commands.Cog):
         )
         
         # Panel URL
-        panel_url = os.getenv('PANEL_URL', 'https://tools.annaway.com.tw/wos/counter-bot/')
+        panel_url = PANEL_URL
         embed.add_field(
             name="📱 Web Panel",
             value=f"[Click to Open]({panel_url})",
-            inline=False
         )
         
         embed.add_field(

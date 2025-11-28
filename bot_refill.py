@@ -10,11 +10,11 @@ import asyncio
 import logging
 import uvicorn
 from threading import Thread
+from utils.config import GUILD_ALLOWLIST, PORT
 
 # Load Environment Variables
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
-GUILD_ALLOWLIST = os.getenv('GUILD_ALLOWLIST', '').split(',') if os.getenv('GUILD_ALLOWLIST') else []
 
 # Setup Logging
 logging.basicConfig(
@@ -46,8 +46,9 @@ async def on_ready():
     # Sync Slash Commands (Guild specific for immediate update)
     try:
         for guild in bot.guilds:
-            synced = await bot.tree.sync(guild=guild)
-            logger.info(f'✅ Synced {len(synced)} slash commands for guild {guild.name}')
+            if guild.id in GUILD_ALLOWLIST:
+                synced = await bot.tree.sync(guild=guild)
+                logger.info(f'✅ Synced {len(synced)} slash commands for guild {guild.name}')
     except Exception as e:
         logger.error(f'❌ Command sync failed: {e}')
     
@@ -155,11 +156,10 @@ def start_fastapi():
     set_discord_callback(sync_discord_callback)
     
     # Start FastAPI
-    port = int(os.getenv('PORT', 8001))
     config = uvicorn.Config(
         app,
         host="0.0.0.0",
-        port=port,
+        port=PORT,
         log_level="info",
         loop="asyncio"
     )

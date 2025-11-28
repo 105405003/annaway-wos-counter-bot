@@ -1,0 +1,23 @@
+# Discord Bot Token
+DISCORD_TOKEN=your_token_here
+
+# Allowed Guild IDs (comma separated)
+# English: 1398071974692913324
+GUILD_ALLOWLIST=1398071974692913324
+
+# Guild ID to Role ID mapping (guild_id:role_id,...)
+# If NOT provided, it will use 'Annaway_Counter' role name
+COUNTER_ROLE_IDS=
+
+# Guild ID to Target Text Channel ID mapping (guild_id:channel_id,...)
+# Used for Refill Timer notifications
+TARGET_TEXT_CHANNEL_IDS=1398071974692913324:YOUR_CHANNEL_ID_HERE
+
+# Fallback Role Name (if ID not found)
+COUNTER_ROLE_NAME=Annaway_Counter
+
+# Web Panel URL (English Version)
+PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1458/
+
+# FastAPI Port
+PORT=8001

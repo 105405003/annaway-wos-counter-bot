@@ -9,6 +9,7 @@ import asyncio
 from typing import Optional
 
 from utils import AudioPlayer, ImageStreamer, CountSessionManager
+from utils.config import GUILD_ALLOWLIST, COUNTER_ROLE_IDS, COUNTER_ROLE_NAME
 
 class CounterView(discord.ui.View):
     """Counter Control Panel View"""
@@ -21,8 +22,32 @@ class CounterView(discord.ui.View):
     async def start_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Start Button"""
         # Check permissions
-        required_role = interaction.guild.get_role(1425481189443244123)
-        if required_role is None or required_role not in interaction.user.roles:
+        if interaction.guild_id not in GUILD_ALLOWLIST:
+            await interaction.response.send_message(
+                "❌ This bot is not configured for this server.",
+                ephemeral=True
+            )
+            return
+
+        role_id = COUNTER_ROLE_IDS.get(interaction.guild_id)
+        required_role = None
+        if role_id:
+            required_role = interaction.guild.get_role(role_id)
+        
+        if required_role is None:
+            required_role = next(
+                (r for r in interaction.guild.roles if r.name == COUNTER_ROLE_NAME),
+                None
+            )
+            
+        if required_role is None:
+            await interaction.response.send_message(
+                "❌ Error: Required role not found!\nPlease ask an admin to check role settings.",
+                ephemeral=True
+            )
+            return
+
+        if required_role not in interaction.user.roles and not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
                 "❌ You don't have permission! Requires `Annaway_Counter` role.",
                 ephemeral=True
@@ -36,8 +61,32 @@ class CounterView(discord.ui.View):
     async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Stop Button"""
         # Check permissions
-        required_role = interaction.guild.get_role(1425481189443244123)
-        if required_role is None or required_role not in interaction.user.roles:
+        if interaction.guild_id not in GUILD_ALLOWLIST:
+            await interaction.response.send_message(
+                "❌ This bot is not configured for this server.",
+                ephemeral=True
+            )
+            return
+
+        role_id = COUNTER_ROLE_IDS.get(interaction.guild_id)
+        required_role = None
+        if role_id:
+            required_role = interaction.guild.get_role(role_id)
+            
+        if required_role is None:
+            required_role = next(
+                (r for r in interaction.guild.roles if r.name == COUNTER_ROLE_NAME),
+                None
+            )
+            
+        if required_role is None:
+            await interaction.response.send_message(
+                "❌ Error: Required role not found!\nPlease ask an admin to check role settings.",
+                ephemeral=True
+            )
+            return
+
+        if required_role not in interaction.user.roles and not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
                 "❌ You don't have permission! Requires `Annaway_Counter` role.",
                 ephemeral=True
@@ -78,23 +127,35 @@ class Counter(commands.Cog):
     @app_commands.command(name="counter", description="Start the counting bot")
     async def counter_command(self, interaction: discord.Interaction):
         """Counter Command"""
-        # Check if user has Annaway_Counter role
-        required_role = interaction.guild.get_role(1425481189443244123)
-        
-        if required_role is None:
-            # Role doesn't exist
+        # Check permissions
+        if interaction.guild_id not in GUILD_ALLOWLIST:
             await interaction.response.send_message(
-                "❌ Error: Required role not found!\n"
-                "Please ask an admin to check role settings.",
+                "❌ This bot is not configured for this server.",
                 ephemeral=True
             )
             return
-        
-        if required_role not in interaction.user.roles:
-            # User doesn't have role
+
+        role_id = COUNTER_ROLE_IDS.get(interaction.guild_id)
+        required_role = None
+        if role_id:
+            required_role = interaction.guild.get_role(role_id)
+            
+        if required_role is None:
+            required_role = next(
+                (r for r in interaction.guild.roles if r.name == COUNTER_ROLE_NAME),
+                None
+            )
+            
+        if required_role is None:
             await interaction.response.send_message(
-                "❌ You don't have permission!\n"
-                "Requires `Annaway_Counter` role to operate.",
+                "❌ Error: Required role not found!\nPlease ask an admin to check role settings.",
+                ephemeral=True
+            )
+            return
+
+        if required_role not in interaction.user.roles and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "❌ You don't have permission!\nRequires `Annaway_Counter` role to operate.",
                 ephemeral=True
             )
             return
