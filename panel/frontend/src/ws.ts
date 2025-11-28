@@ -14,7 +14,7 @@ export class WebSocketClient {
 
   connect() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = `${protocol}//${window.location.host}/wos/counter-bot/1458/ws`;
 
     console.log('正在連接 WebSocket:', wsUrl);
 
