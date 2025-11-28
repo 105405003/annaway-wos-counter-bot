@@ -52,6 +52,8 @@ async def on_ready():
         # Then sync to specific guilds in allowlist for immediate availability
         for guild in bot.guilds:
             if guild.id in GUILD_ALLOWLIST:
+                # 先把全域指令複製到這個 guild，指令才會立即顯示
+                bot.tree.copy_global_to(guild=discord.Object(id=guild.id))
                 guild_synced = await bot.tree.sync(guild=discord.Object(id=guild.id))
                 logger.info(f'✅ Synced {len(guild_synced)} slash commands for guild {guild.name}')
     except Exception as e:
