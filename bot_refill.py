@@ -82,9 +82,15 @@ async def discord_callback(action: str, *args):
             if not timer:
                 return None
             
-            # Assume using first Guild (can be improved)
-            guild_id = bot.guilds[0].id if bot.guilds else None
+            # Use the first guild in GUILD_ALLOWLIST (not just any guild)
+            guild_id = None
+            for guild in bot.guilds:
+                if guild.id in GUILD_ALLOWLIST:
+                    guild_id = guild.id
+                    break
+            
             if not guild_id:
+                logger.error("❌ No guild found in GUILD_ALLOWLIST")
                 return None
             
             return await refill_cog.handle_timer_create(
@@ -94,19 +100,34 @@ async def discord_callback(action: str, *args):
             
         elif action == "timer_tick":
             timer_id, remaining = args[0], args[1]
-            guild_id = bot.guilds[0].id if bot.guilds else None
+            # Use the first guild in GUILD_ALLOWLIST
+            guild_id = None
+            for guild in bot.guilds:
+                if guild.id in GUILD_ALLOWLIST:
+                    guild_id = guild.id
+                    break
             if guild_id:
                 await refill_cog.handle_timer_tick(timer_id, guild_id, remaining)
                 
         elif action == "timer_complete":
             timer_id = args[0]
-            guild_id = bot.guilds[0].id if bot.guilds else None
+            # Use the first guild in GUILD_ALLOWLIST
+            guild_id = None
+            for guild in bot.guilds:
+                if guild.id in GUILD_ALLOWLIST:
+                    guild_id = guild.id
+                    break
             if guild_id:
                 await refill_cog.handle_timer_complete(timer_id, guild_id)
                 
         elif action == "timer_delete":
             timer_id = args[0]
-            guild_id = bot.guilds[0].id if bot.guilds else None
+            # Use the first guild in GUILD_ALLOWLIST
+            guild_id = None
+            for guild in bot.guilds:
+                if guild.id in GUILD_ALLOWLIST:
+                    guild_id = guild.id
+                    break
             if guild_id:
                 await refill_cog.handle_timer_delete(timer_id, guild_id)
                 
