@@ -143,8 +143,19 @@ async def timer_task(timer_id: str):
                 # User can click "Restart" or "Delete"
                 break
             
-            # Update Discord every second (not limited to 60s)
-            if discord_bot_callback:
+            # Smart Discord update frequency to prevent rate limiting
+            # - Last 60s: Update every second (critical phase)
+            # - Before 60s: Update every 5 seconds (save API quota)
+            should_update_discord = False
+            
+            if remaining <= 60:
+                # Critical phase: update every second
+                should_update_discord = True
+            elif remaining % 5 == 0:
+                # Early phase: update every 5 seconds
+                should_update_discord = True
+            
+            if should_update_discord and discord_bot_callback:
                 try:
                     loop = asyncio.get_event_loop()
                     await loop.run_in_executor(
