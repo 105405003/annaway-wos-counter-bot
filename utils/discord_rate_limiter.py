@@ -17,10 +17,10 @@ class PerMessageThrottler:
     Allows concurrent updates to different messages
     """
     
-    def __init__(self, min_interval: float = 0.7):
+    def __init__(self, min_interval: float = 0.5):
         """
         Args:
-            min_interval: Minimum seconds between updates for the same message (default 0.7s)
+            min_interval: Minimum seconds between updates for the same message (default 0.5s)
         """
         self.min_interval = min_interval
         self.last_update_times: Dict[int, float] = {}
@@ -95,7 +95,7 @@ class PerMessageThrottler:
                 del self.pending_updates[message_id]
 
 # Global instance (singleton)
-_per_message_throttler = PerMessageThrottler(min_interval=0.7)
+_per_message_throttler = PerMessageThrottler(min_interval=0.5)
 
 async def throttled_message_update(message: discord.Message, update_func, *args, **kwargs):
     """
