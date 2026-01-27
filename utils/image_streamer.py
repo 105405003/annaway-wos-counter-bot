@@ -1,12 +1,14 @@
 """
 Image Streamer Module
 Manages and updates number images in Discord messages
+Uses pre-uploaded image URLs for fast updates without attachments
 """
 import discord
 import os
 import asyncio
 import logging
-from typing import Optional
+import json
+from typing import Optional, Dict
 from collections import deque
 
 logger = logging.getLogger(__name__)
@@ -18,7 +20,38 @@ class ImageStreamer:
         self.image_dir = image_dir
         self.last_update_time = {}  # message_id -> last update timestamp
         self.update_lock = asyncio.Lock()  # Prevent concurrent updates
+        self.image_urls: Dict[int, str] = {}  # number -> Discord image URL
+        self._load_image_urls()
         
+    def _load_image_urls(self):
+        """Load pre-uploaded image URLs from JSON file"""
+        url_file = 'assets/image_urls.json'
+        try:
+            if os.path.exists(url_file):
+                with open(url_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    # Convert string keys to integers
+                    self.image_urls = {int(k): v for k, v in data.items()}
+                logger.info(f"✅ Loaded {len(self.image_urls)} pre-uploaded image URLs")
+            else:
+                logger.warning(f"⚠️  Image URLs file not found: {url_file}")
+                logger.warning("   Run tools/upload_counter_images.py to create it")
+        except Exception as e:
+            logger.error(f"❌ Failed to load image URLs: {e}")
+    
+    def get_image_url(self, number: int) -> Optional[str]:
+        """
+        Get pre-uploaded image URL for a specific number
+        
+        Args:
+            number: Number to display (0-100)
+            
+        Returns:
+            Discord image URL or None
+        """
+        display_number = abs(number)
+        return self.image_urls.get(display_number)
+    
     def get_image_path(self, number: int) -> Optional[str]:
         """
         Get image path for a specific number
@@ -40,7 +73,7 @@ class ImageStreamer:
     async def update_message_image(self, message: discord.Message, 
                                    number: int, retry_count: int = 0) -> bool:
         """
-        Update image in the message (with rate limit protection)
+        Update image in the message using pre-uploaded URLs (FAST, no attachments)
         
         Args:
             message: Discord Message Object
@@ -50,59 +83,50 @@ class ImageStreamer:
         Returns:
             bool: Success
         """
-        # Rate limit protection: min 0.8s between updates
-        async with self.update_lock:
-            msg_id = message.id
-            current_time = asyncio.get_event_loop().time()
-            last_time = self.last_update_time.get(msg_id, 0)
-            time_since_last = current_time - last_time
-            
-            if time_since_last < 0.8:
-                await asyncio.sleep(0.8 - time_since_last)
-        
-        image_path = self.get_image_path(number)
-        
         try:
-            if image_path:
-                # Upload image if exists
-                file = discord.File(image_path, filename=f"number.png")
-                embed = discord.Embed(
-                    title="🔢 Counting in Progress",
-                    color=0x199E91  # Teal
-                )
-                embed.set_image(url=f"attachment://number.png")
-                
-                await message.edit(embed=embed, attachments=[file])
-            else:
-                # Fallback to text
-                embed = discord.Embed(
-                    title="🔢 Counting in Progress",
-                    description=f"# {abs(number)}",
-                    color=0x199E91
-                )
-                await message.edit(embed=embed, attachments=[])
+            # Get pre-uploaded image URL
+            image_url = self.get_image_url(number)
             
-            # Record successful update time
-            self.last_update_time[msg_id] = asyncio.get_event_loop().time()
+            embed = discord.Embed(
+                title="🔢 Counting in Progress",
+                color=0x199E91  # Teal
+            )
+            
+            if image_url:
+                # Use pre-uploaded image URL (FAST - no attachment upload)
+                embed.set_image(url=image_url)
+                await message.edit(embed=embed)
+            else:
+                # Fallback: try local file upload
+                image_path = self.get_image_path(number)
+                if image_path:
+                    file = discord.File(image_path, filename=f"number.png")
+                    embed.set_image(url=f"attachment://number.png")
+                    await message.edit(embed=embed, attachments=[file])
+                else:
+                    # Last resort: text only
+                    embed.description = f"# {abs(number)}"
+                    await message.edit(embed=embed)
+            
             return True
             
         except discord.HTTPException as e:
             if e.status == 429:  # Rate Limit
-                if retry_count < 5:
+                if retry_count < 3:
                     retry_after = 1.0
                     try:
                         retry_after = float(e.response.headers.get('Retry-After', 1.0))
                     except:
                         pass
                     
-                    logger.warning(f"⚠️  Counter rate limited! Retrying in {retry_after}s (attempt {retry_count + 1}/5)")
+                    logger.warning(f"⚠️  Counter rate limited! Retrying in {retry_after}s (attempt {retry_count + 1}/3)")
                     await asyncio.sleep(retry_after)
                     return await self.update_message_image(message, number, retry_count + 1)
                 else:
-                    logger.error(f"❌ Failed to update counter message: Max retries reached")
+                    logger.error(f"❌ Failed to update counter: Max retries reached")
                     return False
             else:
-                logger.error(f"❌ Failed to update counter message: HTTP {e.status} - {e}")
+                logger.error(f"❌ Failed to update counter: HTTP {e.status} - {e}")
                 return False
         except Exception as e:
             logger.error(f"❌ Unexpected error updating counter: {e}")

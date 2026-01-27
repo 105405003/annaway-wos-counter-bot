@@ -57,6 +57,14 @@ PORT=8001
 AUDIO_DIR=assets/audio_en
 
 # ================================================
+# Counter Images Configuration
+# ================================================
+
+# Channel ID for uploading counter images (run tools/upload_counter_images.py once)
+# Use the same channel ID where counter messages will be displayed
+IMAGE_UPLOAD_CHANNEL_ID=1353411026556817560
+
+# ================================================
 # Notes:
 # ================================================
 # 1. Replace YOUR_ENGLISH_BOT_TOKEN_HERE with actual Discord Token
