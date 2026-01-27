@@ -10,6 +10,7 @@ import logging
 import json
 from typing import Optional, Dict
 from collections import deque
+from .discord_rate_limiter import schedule_discord_update
 
 logger = logging.getLogger(__name__)
 
@@ -71,66 +72,43 @@ class ImageStreamer:
             return None
     
     async def update_message_image(self, message: discord.Message, 
-                                   number: int, retry_count: int = 0) -> bool:
+                                   number: int) -> bool:
         """
-        Update image in the message using pre-uploaded URLs (FAST, no attachments)
+        Update image in the message using pre-uploaded URLs (queued through rate limiter)
         
         Args:
             message: Discord Message Object
             number: Number to display
-            retry_count: Current retry attempt
             
         Returns:
-            bool: Success
+            bool: Success (always True - queued)
         """
-        try:
-            # Get pre-uploaded image URL
-            image_url = self.get_image_url(number)
-            
-            embed = discord.Embed(
-                title="🔢 Counting in Progress",
-                color=0x199E91  # Teal
-            )
-            
-            if image_url:
-                # Use pre-uploaded image URL (FAST - no attachment upload)
-                embed.set_image(url=image_url)
-                await message.edit(embed=embed)
+        # Get pre-uploaded image URL
+        image_url = self.get_image_url(number)
+        
+        embed = discord.Embed(
+            title="🔢 Counting in Progress",
+            color=0x199E91  # Teal
+        )
+        
+        if image_url:
+            # Use pre-uploaded image URL (FAST - no attachment upload)
+            embed.set_image(url=image_url)
+            # Schedule through global rate limiter
+            await schedule_discord_update(message.edit, embed=embed)
+        else:
+            # Fallback: try local file upload (slower, but shouldn't happen if images are pre-uploaded)
+            image_path = self.get_image_path(number)
+            if image_path:
+                file = discord.File(image_path, filename=f"number.png")
+                embed.set_image(url=f"attachment://number.png")
+                await schedule_discord_update(message.edit, embed=embed, attachments=[file])
             else:
-                # Fallback: try local file upload
-                image_path = self.get_image_path(number)
-                if image_path:
-                    file = discord.File(image_path, filename=f"number.png")
-                    embed.set_image(url=f"attachment://number.png")
-                    await message.edit(embed=embed, attachments=[file])
-                else:
-                    # Last resort: text only
-                    embed.description = f"# {abs(number)}"
-                    await message.edit(embed=embed)
-            
-            return True
-            
-        except discord.HTTPException as e:
-            if e.status == 429:  # Rate Limit
-                if retry_count < 3:
-                    retry_after = 1.0
-                    try:
-                        retry_after = float(e.response.headers.get('Retry-After', 1.0))
-                    except:
-                        pass
-                    
-                    logger.warning(f"⚠️  Counter rate limited! Retrying in {retry_after}s (attempt {retry_count + 1}/3)")
-                    await asyncio.sleep(retry_after)
-                    return await self.update_message_image(message, number, retry_count + 1)
-                else:
-                    logger.error(f"❌ Failed to update counter: Max retries reached")
-                    return False
-            else:
-                logger.error(f"❌ Failed to update counter: HTTP {e.status} - {e}")
-                return False
-        except Exception as e:
-            logger.error(f"❌ Unexpected error updating counter: {e}")
-            return False
+                # Last resort: text only
+                embed.description = f"# {abs(number)}"
+                await schedule_discord_update(message.edit, embed=embed)
+        
+        return True
     
     async def create_initial_message(self, channel: discord.TextChannel) -> discord.Message:
         """

@@ -1,7 +1,7 @@
 """
 Discord Pink Card Management
 Creates and updates Embed messages, handling rate limits
-Simplified version - relies on Discord.py's built-in rate limit handling
+Uses global rate limiter for sequential updates
 """
 import discord
 import logging
@@ -9,6 +9,7 @@ from datetime import datetime
 import asyncio
 from typing import Optional
 from .timeops import format_countdown
+from .discord_rate_limiter import schedule_discord_update
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ async def create_refill_card(channel, name: str, remaining: int) -> Optional[dis
 
 async def update_refill_card(message: discord.Message, name: str, remaining: int) -> bool:
     """
-    Update Refill Timer Card (simplified, relies on Discord.py rate limit handling)
+    Update Refill Timer Card (queued through global rate limiter)
     
     Args:
         message: Discord Message
@@ -52,7 +53,7 @@ async def update_refill_card(message: discord.Message, name: str, remaining: int
         remaining: Remaining Seconds
         
     Returns:
-        Success boolean
+        Success boolean (always True - queued for async processing)
     """
     if remaining <= 0:
         description = "🎯 **REFILL** 🎯"
@@ -66,18 +67,9 @@ async def update_refill_card(message: discord.Message, name: str, remaining: int
     )
     embed.set_footer(text="Refill Timer" if remaining > 0 else "Finished!")
     
-    try:
-        await message.edit(embed=embed)
-        return True
-    except discord.HTTPException as e:
-        # Discord.py automatically handles 429 rate limits with retries
-        # We just log non-429 errors
-        if e.status != 429:
-            logger.error(f"❌ Failed to update refill card: HTTP {e.status} - {e}")
-        return False
-    except Exception as e:
-        logger.error(f"❌ Unexpected error updating refill card: {e}")
-        return False
+    # Schedule through global rate limiter (prevents concurrent updates)
+    await schedule_discord_update(message.edit, embed=embed)
+    return True
 
 async def delete_refill_card(message: discord.Message) -> bool:
     """
