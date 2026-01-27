@@ -4,13 +4,20 @@ Manages and updates number images in Discord messages
 """
 import discord
 import os
+import asyncio
+import logging
 from typing import Optional
+from collections import deque
+
+logger = logging.getLogger(__name__)
 
 class ImageStreamer:
     """Image Streamer Class"""
     
     def __init__(self, image_dir: str = 'assets/images'):
         self.image_dir = image_dir
+        self.last_update_time = {}  # message_id -> last update timestamp
+        self.update_lock = asyncio.Lock()  # Prevent concurrent updates
         
     def get_image_path(self, number: int) -> Optional[str]:
         """
@@ -31,17 +38,28 @@ class ImageStreamer:
             return None
     
     async def update_message_image(self, message: discord.Message, 
-                                   number: int) -> bool:
+                                   number: int, retry_count: int = 0) -> bool:
         """
-        Update image in the message
+        Update image in the message (with rate limit protection)
         
         Args:
             message: Discord Message Object
             number: Number to display
+            retry_count: Current retry attempt
             
         Returns:
             bool: Success
         """
+        # Rate limit protection: min 0.8s between updates
+        async with self.update_lock:
+            msg_id = message.id
+            current_time = asyncio.get_event_loop().time()
+            last_time = self.last_update_time.get(msg_id, 0)
+            time_since_last = current_time - last_time
+            
+            if time_since_last < 0.8:
+                await asyncio.sleep(0.8 - time_since_last)
+        
         image_path = self.get_image_path(number)
         
         try:
@@ -63,14 +81,31 @@ class ImageStreamer:
                     color=0x199E91
                 )
                 await message.edit(embed=embed, attachments=[])
-                
+            
+            # Record successful update time
+            self.last_update_time[msg_id] = asyncio.get_event_loop().time()
             return True
             
         except discord.HTTPException as e:
-            print(f"❌ Failed to update message: {e}")
-            return False
+            if e.status == 429:  # Rate Limit
+                if retry_count < 5:
+                    retry_after = 1.0
+                    try:
+                        retry_after = float(e.response.headers.get('Retry-After', 1.0))
+                    except:
+                        pass
+                    
+                    logger.warning(f"⚠️  Counter rate limited! Retrying in {retry_after}s (attempt {retry_count + 1}/5)")
+                    await asyncio.sleep(retry_after)
+                    return await self.update_message_image(message, number, retry_count + 1)
+                else:
+                    logger.error(f"❌ Failed to update counter message: Max retries reached")
+                    return False
+            else:
+                logger.error(f"❌ Failed to update counter message: HTTP {e.status} - {e}")
+                return False
         except Exception as e:
-            print(f"❌ Unexpected error: {e}")
+            logger.error(f"❌ Unexpected error updating counter: {e}")
             return False
     
     async def create_initial_message(self, channel: discord.TextChannel) -> discord.Message:
