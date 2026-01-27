@@ -1,0 +1,235 @@
+==================================================
+    零延遲計數器部署指南 (Image Pre-Upload)
+==================================================
+
+🎯 目標
+--------------------------------------------------
+透過預先上傳所有計數器圖片到 Discord，
+實現 Counter 和 Refill 同時運行時的每秒更新，零延遲。
+
+⚙️ 原理
+--------------------------------------------------
+之前：每次更新上傳新圖片 → 大量 API 調用 → Rate Limit 429
+現在：使用預上傳的圖片 URL → 只編輯 embed → 極少 API 負擔
+
+==================================================
+部署步驟（在 VM 上執行）
+==================================================
+
+1️⃣ 上傳更新的檔案
+--------------------------------------------------
+# 透過 GCP Console SSH 上傳以下檔案：
+
+📁 需要上傳的檔案：
+- utils/discord_cards.py
+- utils/image_streamer.py  
+- tools/upload_counter_images.py
+
+# 上傳方法：
+# SSH 視窗右上角 → ⚙️ → 上傳檔案
+
+2️⃣ 套用檔案到專案
+--------------------------------------------------
+cd ~/wos-english-refill-bot
+
+# 複製檔案
+cp ~/discord_cards.py utils/discord_cards.py
+cp ~/image_streamer.py utils/image_streamer.py
+cp ~/upload_counter_images.py tools/upload_counter_images.py
+
+# 清理暫存
+rm ~/discord_cards.py ~/image_streamer.py ~/upload_counter_images.py
+
+# 設定執行權限
+chmod +x tools/upload_counter_images.py
+
+3️⃣ 更新 .env 配置
+--------------------------------------------------
+nano .env
+
+# 添加以下行：
+IMAGE_UPLOAD_CHANNEL_ID=1353411026556817560
+
+# Ctrl+O 存檔，Ctrl+X 離開
+
+4️⃣ 預先上傳所有計數器圖片（重要！）
+--------------------------------------------------
+# 這個步驟只需要執行一次，會上傳 0-100 所有圖片
+
+cd ~/wos-english-refill-bot
+source venv/bin/activate
+
+# 執行圖片上傳工具（需要 2-3 分鐘）
+python3 tools/upload_counter_images.py
+
+# 預期輸出：
+# ✅ Logged in as Annaway_WOS_English_Count_Bot#3803
+# 📤 Uploading images to channel ID: 1353411026556817560
+# ✅ Uploaded 0: https://cdn.discordapp.com/...
+# ✅ Uploaded 1: https://cdn.discordapp.com/...
+# ...
+# 🎉 Successfully uploaded 101 images!
+# 💾 URLs saved to: assets/image_urls.json
+
+# ⚠️ 重要：確認看到 "Successfully uploaded 101 images!"
+
+5️⃣ 確認 image_urls.json 已創建
+--------------------------------------------------
+ls -lh assets/image_urls.json
+
+# 應該看到一個約 10-20 KB 的 JSON 檔案
+# 例如：
+# -rw-rw-r-- 1 anna_c anna_c 15K Jan 27 09:00 assets/image_urls.json
+
+# 查看內容（確認格式正確）
+head -10 assets/image_urls.json
+
+# 應該看到類似：
+# {
+#   "0": "https://cdn.discordapp.com/attachments/...",
+#   "1": "https://cdn.discordapp.com/attachments/...",
+#   ...
+# }
+
+6️⃣ 清理 Python 緩存並重啟服務
+--------------------------------------------------
+cd ~/wos-english-refill-bot
+
+# 清理緩存
+find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+find . -type f -name "*.pyc" -delete 2>/dev/null
+
+# 重啟服務
+sudo systemctl restart refill-bot-en
+
+# 等待啟動
+sleep 10
+
+# 查看日誌（應該看到 "Loaded XX pre-uploaded image URLs"）
+sudo journalctl -u refill-bot-en --since "30 seconds ago" --no-pager | grep -E "image URLs|ERROR|WARNING"
+
+# 預期看到：
+# ✅ Loaded 101 pre-uploaded image URLs
+
+7️⃣ 測試並監控
+--------------------------------------------------
+# 即時監控日誌
+sudo journalctl -u refill-bot-en -f
+
+# 在 Discord 中同時：
+# 1. 使用 /counter 開始計數
+# 2. 使用網頁面板創建 refill timer
+
+# 觀察日誌：
+# ✅ 應該幾乎沒有 "Rate limited" 警告
+# ✅ Counter 更新應該非常流暢
+# ✅ Refill 卡片更新正常
+
+# 按 Ctrl+C 停止監控
+
+==================================================
+✅ 成功檢查清單
+==================================================
+□ 所有 3 個檔案已上傳並複製到正確位置
+□ .env 已添加 IMAGE_UPLOAD_CHANNEL_ID
+□ upload_counter_images.py 成功執行（101 images）
+□ assets/image_urls.json 檔案已創建
+□ 服務重啟成功
+□ 日誌顯示 "Loaded 101 pre-uploaded image URLs"
+□ Counter 測試流暢無延遲
+□ 與 Refill 同時運行無 Rate Limit 警告
+
+==================================================
+🔍 故障排除
+==================================================
+
+問題 1：upload_counter_images.py 執行失敗
+--------------------------------------------------
+錯誤：Channel XXXX not found!
+
+解決：
+1. 確認 .env 中的 IMAGE_UPLOAD_CHANNEL_ID 正確
+2. 確認 Bot 已加入該頻道所在的伺服器
+3. 確認 Bot 有該頻道的發送訊息權限
+
+問題 2：日誌沒有顯示 "Loaded ... image URLs"
+--------------------------------------------------
+可能原因：image_urls.json 不存在或路徑錯誤
+
+解決：
+cd ~/wos-english-refill-bot
+ls -lh assets/image_urls.json
+
+# 如果不存在，重新執行步驟 4
+
+問題 3：Counter 還是使用圖片附件上傳
+--------------------------------------------------
+症狀：日誌中看到大量 Rate Limit 警告
+
+解決：
+1. 確認 image_urls.json 格式正確（JSON 有效）
+2. 確認 image_urls.json 包含 0-100 的所有鍵
+3. 重新執行步驟 4 和 6
+
+問題 4：圖片上傳後 Counter 顯示空白
+--------------------------------------------------
+原因：Discord CDN URL 可能過期（罕見）
+
+解決：
+# 重新上傳圖片
+cd ~/wos-english-refill-bot
+source venv/bin/activate
+rm -f assets/image_urls.json
+python3 tools/upload_counter_images.py
+
+==================================================
+📊 性能對比
+==================================================
+
+優化前：
+- Counter 每次更新：上傳圖片附件 (~200KB)
+- Refill 每次更新：編輯 embed
+- 同時運行：每秒 2-3 次 API 調用
+- 結果：頻繁 Rate Limit 429，延遲嚴重
+
+優化後：
+- Counter 每次更新：僅編輯 embed URL (~1KB)
+- Refill 每次更新：編輯 embed
+- 同時運行：每秒 2 次輕量 API 調用
+- 結果：幾乎零 Rate Limit，流暢無延遲
+
+API 負擔降低：~99%（200KB → 1KB）
+
+==================================================
+🔄 日常維護
+==================================================
+
+何時需要重新上傳圖片？
+--------------------------------------------------
+通常不需要！除非：
+1. 更換了 Discord 頻道
+2. 圖片檔案內容更新（assets/images/*.png）
+3. Discord CDN URL 失效（極罕見）
+
+重新上傳步驟：
+--------------------------------------------------
+cd ~/wos-english-refill-bot
+source venv/bin/activate
+
+# 刪除舊的 URL 檔案
+rm -f assets/image_urls.json
+
+# 重新上傳
+python3 tools/upload_counter_images.py
+
+# 重啟服務
+sudo systemctl restart refill-bot-en
+
+==================================================
+📞 需要協助？
+==================================================
+如果遇到問題，請提供：
+1. journalctl 日誌（最後 50 行）
+2. assets/image_urls.json 檔案內容（前 10 行）
+3. .env 檔案中的 IMAGE_UPLOAD_CHANNEL_ID
+4. Discord 頻道 ID 和 Bot 權限截圖
