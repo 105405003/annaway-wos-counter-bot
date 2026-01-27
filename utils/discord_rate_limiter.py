@@ -17,10 +17,10 @@ class PerMessageThrottler:
     Allows concurrent updates to different messages
     """
     
-    def __init__(self, min_interval: float = 0.5):
+    def __init__(self, min_interval: float = 1.0):
         """
         Args:
-            min_interval: Minimum seconds between updates for the same message (default 0.5s)
+            min_interval: Minimum seconds between updates for the same message (default 1.0s)
         """
         self.min_interval = min_interval
         self.last_update_times: Dict[int, float] = {}
@@ -48,7 +48,13 @@ class PerMessageThrottler:
         async with lock:
             # Cancel pending update for this message (only keep the latest)
             if message_id in self.pending_updates:
-                self.pending_updates[message_id].cancel()
+                old_task = self.pending_updates[message_id]
+                if not old_task.done():
+                    old_task.cancel()
+                    try:
+                        await old_task
+                    except asyncio.CancelledError:
+                        pass
             
             # Calculate wait time
             current_time = asyncio.get_event_loop().time()
@@ -89,7 +95,7 @@ class PerMessageThrottler:
                 del self.pending_updates[message_id]
 
 # Global instance (singleton)
-_per_message_throttler = PerMessageThrottler(min_interval=0.5)
+_per_message_throttler = PerMessageThrottler(min_interval=1.0)
 
 async def throttled_message_update(message: discord.Message, update_func, *args, **kwargs):
     """
