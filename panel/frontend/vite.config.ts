@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/wos/counter-bot/1458/',
+  base: '/wos/counter-bot/1489/',
   server: {
     port: 3000,
     proxy: {

@@ -12,7 +12,7 @@ DISCORD_TOKEN=YOUR_ENGLISH_BOT_TOKEN_HERE
 
 # Allowed Guild IDs (Whitelist) - English Server Only
 # Format: guild_id1,guild_id2,...
-GUILD_ALLOWLIST=1398071974692913324
+GUILD_ALLOWLIST=1353410271804133469
 
 # ================================================
 # Role Configuration
@@ -35,14 +35,14 @@ COUNTER_ROLE_NAME=Annaway_Counter
 # Format: guild_id:channel_id,guild_id2:channel_id2
 # This is where /refill cards will be posted
 # Example: TARGET_TEXT_CHANNEL_IDS=1398071974692913324:1234567890123456789
-TARGET_TEXT_CHANNEL_IDS=1398071974692913324:YOUR_CHANNEL_ID_HERE
+TARGET_TEXT_CHANNEL_IDS=1353410271804133469:1353411026556817560
 
 # ================================================
 # Web Panel Configuration
 # ================================================
 
 # Web Panel URL (English Version)
-PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1458/
+PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1489/
 
 # FastAPI Backend Port
 PORT=8001

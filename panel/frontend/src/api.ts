@@ -2,7 +2,7 @@
  * API Client
  */
 
-const BASE_URL = '/wos/counter-bot/1458/api';
+const BASE_URL = '/wos/counter-bot/1489/api';
 
 export interface Timer {
   id: string;
