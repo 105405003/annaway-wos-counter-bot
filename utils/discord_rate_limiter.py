@@ -1,85 +1,106 @@
 """
-Global Discord Rate Limiter
-Ensures all Discord message edits are queued and executed sequentially
-to prevent concurrent API calls that trigger rate limiting
+Per-Message Discord Rate Limiter
+Throttles updates for each message individually to prevent spam
+while allowing concurrent updates to different messages
 """
 import asyncio
 import logging
-from typing import Callable, Any
-from collections import deque
+from typing import Dict, Any, Optional
 from datetime import datetime
+import discord
 
 logger = logging.getLogger(__name__)
 
-class GlobalDiscordRateLimiter:
+class PerMessageThrottler:
     """
-    Global singleton to manage all Discord API calls
-    Ensures updates are sequential with proper spacing
+    Per-message throttle to prevent excessive updates to the same message
+    Allows concurrent updates to different messages
     """
     
-    def __init__(self, min_interval: float = 0.2):
+    def __init__(self, min_interval: float = 0.5):
         """
         Args:
-            min_interval: Minimum seconds between Discord API calls (default 0.2s = 5 calls/sec)
+            min_interval: Minimum seconds between updates for the same message (default 0.5s)
         """
         self.min_interval = min_interval
-        self.queue = deque()
-        self.processing = False
-        self.last_call_time = 0.0
-        self.lock = asyncio.Lock()
+        self.last_update_times: Dict[int, float] = {}
+        self.pending_updates: Dict[int, asyncio.Task] = {}
+        self.locks: Dict[int, asyncio.Lock] = {}
         
-    async def schedule_update(self, update_func: Callable, *args, **kwargs):
+    def _get_lock(self, message_id: int) -> asyncio.Lock:
+        """Get or create lock for a message"""
+        if message_id not in self.locks:
+            self.locks[message_id] = asyncio.Lock()
+        return self.locks[message_id]
+    
+    async def schedule_update(self, message: discord.Message, update_func, *args, **kwargs):
         """
-        Schedule a Discord update to be executed in the global queue
+        Schedule an update for a message with throttling
         
         Args:
-            update_func: Async function to call
+            message: Discord Message to update
+            update_func: Async function to call (e.g., message.edit)
             *args, **kwargs: Arguments for the function
         """
-        # Add to queue
-        self.queue.append((update_func, args, kwargs))
+        message_id = message.id
+        lock = self._get_lock(message_id)
         
-        # Start processor if not running
-        async with self.lock:
-            if not self.processing:
-                asyncio.create_task(self._process_queue())
+        async with lock:
+            # Cancel pending update for this message (only keep the latest)
+            if message_id in self.pending_updates:
+                self.pending_updates[message_id].cancel()
+            
+            # Calculate wait time
+            current_time = asyncio.get_event_loop().time()
+            last_update = self.last_update_times.get(message_id, 0)
+            time_since_last = current_time - last_update
+            
+            wait_time = max(0, self.min_interval - time_since_last)
+            
+            # Schedule the update
+            task = asyncio.create_task(
+                self._execute_update(message_id, wait_time, update_func, *args, **kwargs)
+            )
+            self.pending_updates[message_id] = task
     
-    async def _process_queue(self):
-        """Process the update queue sequentially"""
-        async with self.lock:
-            self.processing = True
-        
+    async def _execute_update(self, message_id: int, wait_time: float, update_func, *args, **kwargs):
+        """Execute the update after wait time"""
         try:
-            while self.queue:
-                # Get next update
-                update_func, args, kwargs = self.queue.popleft()
-                
-                # Enforce minimum interval
-                current_time = asyncio.get_event_loop().time()
-                time_since_last = current_time - self.last_call_time
-                
-                if time_since_last < self.min_interval:
-                    await asyncio.sleep(self.min_interval - time_since_last)
-                
-                # Execute update
-                try:
-                    await update_func(*args, **kwargs)
-                    self.last_call_time = asyncio.get_event_loop().time()
-                except Exception as e:
-                    logger.error(f"Discord update failed: {e}")
-                
+            if wait_time > 0:
+                await asyncio.sleep(wait_time)
+            
+            # Execute update
+            await update_func(*args, **kwargs)
+            
+            # Record update time
+            self.last_update_times[message_id] = asyncio.get_event_loop().time()
+            
+        except asyncio.CancelledError:
+            # Update was cancelled by a newer update
+            pass
+        except discord.HTTPException as e:
+            if e.status != 404:  # Ignore "Unknown Message" errors
+                logger.error(f"Discord update failed: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error in Discord update: {e}")
         finally:
-            async with self.lock:
-                self.processing = False
+            # Clean up
+            if message_id in self.pending_updates:
+                del self.pending_updates[message_id]
 
 # Global instance (singleton)
-_global_rate_limiter = GlobalDiscordRateLimiter(min_interval=0.25)
+_per_message_throttler = PerMessageThrottler(min_interval=0.5)
 
-async def schedule_discord_update(update_func: Callable, *args, **kwargs):
+async def throttled_message_update(message: discord.Message, update_func, *args, **kwargs):
     """
-    Public API: Schedule a Discord update through the global rate limiter
+    Public API: Schedule a throttled update for a Discord message
+    
+    Args:
+        message: Discord Message object
+        update_func: Async function to call (e.g., message.edit)
+        *args, **kwargs: Arguments for the function
     
     Usage:
-        await schedule_discord_update(message.edit, embed=my_embed)
+        await throttled_message_update(message, message.edit, embed=my_embed)
     """
-    await _global_rate_limiter.schedule_update(update_func, *args, **kwargs)
+    await _per_message_throttler.schedule_update(message, update_func, *args, **kwargs)

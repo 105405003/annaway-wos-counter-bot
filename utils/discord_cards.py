@@ -1,7 +1,7 @@
 """
 Discord Pink Card Management
 Creates and updates Embed messages, handling rate limits
-Uses global rate limiter for sequential updates
+Uses per-message throttling for smooth updates
 """
 import discord
 import logging
@@ -9,7 +9,7 @@ from datetime import datetime
 import asyncio
 from typing import Optional
 from .timeops import format_countdown
-from .discord_rate_limiter import schedule_discord_update
+from .discord_rate_limiter import throttled_message_update
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ async def create_refill_card(channel, name: str, remaining: int) -> Optional[dis
 
 async def update_refill_card(message: discord.Message, name: str, remaining: int) -> bool:
     """
-    Update Refill Timer Card (queued through global rate limiter)
+    Update Refill Timer Card (throttled per-message)
     
     Args:
         message: Discord Message
@@ -67,8 +67,8 @@ async def update_refill_card(message: discord.Message, name: str, remaining: int
     )
     embed.set_footer(text="Refill Timer" if remaining > 0 else "Finished!")
     
-    # Schedule through global rate limiter (prevents concurrent updates)
-    await schedule_discord_update(message.edit, embed=embed)
+    # Throttle updates for this specific message
+    await throttled_message_update(message, message.edit, embed=embed)
     return True
 
 async def delete_refill_card(message: discord.Message) -> bool:

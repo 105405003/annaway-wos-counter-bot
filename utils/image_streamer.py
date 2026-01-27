@@ -10,7 +10,7 @@ import logging
 import json
 from typing import Optional, Dict
 from collections import deque
-from .discord_rate_limiter import schedule_discord_update
+from .discord_rate_limiter import throttled_message_update
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class ImageStreamer:
     async def update_message_image(self, message: discord.Message, 
                                    number: int) -> bool:
         """
-        Update image in the message using pre-uploaded URLs (queued through rate limiter)
+        Update image in the message using pre-uploaded URLs (throttled per-message)
         
         Args:
             message: Discord Message Object
@@ -94,19 +94,19 @@ class ImageStreamer:
         if image_url:
             # Use pre-uploaded image URL (FAST - no attachment upload)
             embed.set_image(url=image_url)
-            # Schedule through global rate limiter
-            await schedule_discord_update(message.edit, embed=embed)
+            # Throttle updates for this specific message
+            await throttled_message_update(message, message.edit, embed=embed)
         else:
             # Fallback: try local file upload (slower, but shouldn't happen if images are pre-uploaded)
             image_path = self.get_image_path(number)
             if image_path:
                 file = discord.File(image_path, filename=f"number.png")
                 embed.set_image(url=f"attachment://number.png")
-                await schedule_discord_update(message.edit, embed=embed, attachments=[file])
+                await throttled_message_update(message, message.edit, embed=embed, attachments=[file])
             else:
                 # Last resort: text only
                 embed.description = f"# {abs(number)}"
-                await schedule_discord_update(message.edit, embed=embed)
+                await throttled_message_update(message, message.edit, embed=embed)
         
         return True
     
