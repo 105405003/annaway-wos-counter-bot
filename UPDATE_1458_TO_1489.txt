@@ -1,0 +1,202 @@
+==================================================
+   英文版從 1458 改成 1489 - 瀏覽器上傳指南
+==================================================
+
+📋 變更摘要
+--------------------------------------------------
+- 舊伺服器 ID：1398071974692913324 (1458)
+- 新伺服器 ID：1353410271804133469 (1489)
+- 頻道 ID：1353411026556817560
+- 新網址：https://tools.annaway.com.tw/wos/counter-bot/1489/
+
+🌐 步驟一：透過 GCP Console 瀏覽器上傳檔案
+==================================================
+
+1. 開啟 GCP Console
+--------------------------------------------------
+→ 前往 https://console.cloud.google.com/
+→ 選擇您的專案
+→ 點選左側選單：Compute Engine → VM 執行個體
+→ 找到 wos-chinese-counter-bot-static-ip
+→ 點選 SSH 按鈕（會開啟瀏覽器 SSH 視窗）
+
+2. 準備上傳資料夾
+--------------------------------------------------
+# 在 SSH 視窗中執行
+cd ~/wos-english-refill-bot
+mkdir -p temp_update
+cd temp_update
+
+3. 上傳檔案（使用瀏覽器上傳功能）
+--------------------------------------------------
+在 SSH 視窗右上角，點選 ⚙️（齒輪圖示）→ 「上傳檔案」
+
+依序上傳以下 4 個檔案：
+
+📁 需要上傳的檔案清單：
+┌─────────────────────────────────────────────────────┐
+│ 1. vite.config.ts                                   │
+│    本地路徑：panel/frontend/vite.config.ts          │
+│                                                     │
+│ 2. api.ts                                           │
+│    本地路徑：panel/frontend/src/api.ts              │
+│                                                     │
+│ 3. ws.ts                                            │
+│    本地路徑：panel/frontend/src/ws.ts               │
+│                                                     │
+│ 4. App.tsx                                          │
+│    本地路徑：panel/frontend/src/App.tsx             │
+└─────────────────────────────────────────────────────┘
+
+⚠️ 上傳提醒：
+- 每次只能上傳一個檔案
+- 上傳後會在 ~/wos-english-refill-bot/temp_update/ 資料夾
+- 確認所有 4 個檔案都上傳完成後再繼續
+
+4. 確認上傳完成
+--------------------------------------------------
+# 在 SSH 視窗中執行
+cd ~/wos-english-refill-bot/temp_update
+ls -lh
+
+# 應該看到 4 個檔案：
+# vite.config.ts
+# api.ts
+# ws.ts
+# App.tsx
+
+📝 步驟二：在 VM 上套用更新
+==================================================
+
+1. 備份並替換檔案
+--------------------------------------------------
+cd ~/wos-english-refill-bot
+
+# 複製更新的檔案到正確位置
+cp temp_update/vite.config.ts panel/frontend/vite.config.ts
+cp temp_update/api.ts panel/frontend/src/api.ts
+cp temp_update/ws.ts panel/frontend/src/ws.ts
+cp temp_update/App.tsx panel/frontend/src/App.tsx
+
+# 清理暫存資料夾
+rm -rf temp_update
+
+2. 更新 .env 設定檔
+--------------------------------------------------
+cd ~/wos-english-refill-bot
+nano .env
+
+# 修改以下 3 行：
+GUILD_ALLOWLIST=1353410271804133469
+TARGET_TEXT_CHANNEL_IDS=1353410271804133469:1353411026556817560
+PANEL_URL=https://tools.annaway.com.tw/wos/counter-bot/1489/
+
+# Ctrl+O 存檔，Enter 確認，Ctrl+X 離開
+
+3. 重新建置前端
+--------------------------------------------------
+cd ~/wos-english-refill-bot/panel/frontend
+
+# 啟動虛擬環境（如果還沒啟動）
+source ~/wos-english-refill-bot/venv/bin/activate
+
+# 清理並重建
+rm -rf dist
+npm run build
+
+# 確認建置成功
+ls -lh dist/
+
+4. 部署前端到 Nginx
+--------------------------------------------------
+cd ~/wos-english-refill-bot
+sudo cp -r panel/frontend/dist/* /var/www/refill-bot-en/
+
+# 確認檔案時間（應該是最新的）
+ls -lh /var/www/refill-bot-en/assets/*.js | tail -1
+
+5. 更新 Nginx 設定
+--------------------------------------------------
+sudo nano /etc/nginx/sites-available/refill-bot
+
+# 找到英文版區塊，將所有 1458 改成 1489（共 3 處）：
+#
+# location /wos/counter-bot/1489/ {
+#     alias /var/www/refill-bot-en/;
+#     try_files $uri $uri/ /wos/counter-bot/1489/index.html;
+#     index index.html;
+# }
+#
+# location /wos/counter-bot/1489/api/ {
+#     proxy_pass http://127.0.0.1:8001/api/;
+#     ...
+# }
+#
+# location /wos/counter-bot/1489/ws {
+#     proxy_pass http://127.0.0.1:8001/ws;
+#     ...
+# }
+
+# Ctrl+O 存檔，Ctrl+X 離開
+
+# 測試 Nginx 設定
+sudo nginx -t
+
+# 如果顯示 OK，重新載入 Nginx
+sudo systemctl reload nginx
+
+6. 重啟英文版 Bot
+--------------------------------------------------
+sudo systemctl restart refill-bot-en
+
+# 查看服務狀態
+sudo systemctl status refill-bot-en
+
+# 查看最新日誌
+sudo journalctl -u refill-bot-en -n 30 --no-pager
+
+# 應該看到：
+# ✅ Bot logged in as Annaway_WOS_English_Count_Bot#xxxx
+# ✅ Connected to 1 guilds
+# ✅ Synced 2 slash commands globally
+# ✅ Synced 2 slash commands for guild ...
+
+7. 測試新網址
+--------------------------------------------------
+# 開啟瀏覽器，按 Ctrl+Shift+R 強制重新整理
+https://tools.annaway.com.tw/wos/counter-bot/1489/
+
+✅ 完成檢查清單
+==================================================
+□ .env 已更新（GUILD_ALLOWLIST, TARGET_TEXT_CHANNEL_IDS, PANEL_URL）
+□ 前端已重新建置（npm run build）
+□ 前端已部署到 /var/www/refill-bot-en/
+□ Nginx 設定已更新（1458 → 1489）
+□ Nginx 測試通過（nginx -t）
+□ Nginx 已重新載入
+□ Bot 服務已重啟
+□ 日誌顯示成功登入和同步指令
+□ 新網址可正常訪問
+
+⚠️ 重要提醒
+==================================================
+1. Discord Bot 授權：
+   - 如果這是不同的 Discord 伺服器，需要重新邀請 Bot
+   - 前往 Discord Developer Portal
+   - 選擇您的 Bot → OAuth2 → URL Generator
+   - 勾選：bot, applications.commands
+   - Bot Permissions：勾選需要的權限
+   - 複製產生的網址，在瀏覽器開啟邀請 Bot
+
+2. 確保新伺服器有 "Annaway_Counter" 身份組
+   - 或在 .env 設定 COUNTER_ROLE_IDS 對應的身份組 ID
+
+3. 舊的 1458 網址會失效
+   - 如果還需要同時支援，需要保留兩組設定
+
+📞 需要協助？
+==================================================
+如果遇到問題，請提供：
+- journalctl 日誌輸出
+- 瀏覽器 Console 錯誤訊息（F12）
+- nginx -t 測試結果
