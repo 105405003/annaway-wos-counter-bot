@@ -124,9 +124,9 @@ class Counter(commands.Cog):
             except Exception as e:
                 logger.error(f"❌ Failed to delete message ({message.id}): {e}")
         
-    @app_commands.command(name="voicein", description="Join voice channel and stay connected")
-    async def voicein_command(self, interaction: discord.Interaction):
-        """Voice In Command - Join and stay in voice channel"""
+    @app_commands.command(name="counterin", description="Join voice channel and stay connected")
+    async def counterin_command(self, interaction: discord.Interaction):
+        """Counter In Command - Join and stay in voice channel"""
         # Check permissions
         if interaction.guild_id not in GUILD_ALLOWLIST:
             await interaction.response.send_message(
@@ -247,7 +247,7 @@ class Counter(commands.Cog):
         
         if voice_client and voice_client.is_connected():
             await interaction.followup.send(
-                f"🎤 Joined **{voice_channel.name}**!\nUse `/voiceout` to disconnect.",
+                f"🎤 Joined **{voice_channel.name}**!\nUse `/counterout` to disconnect.",
                 ephemeral=False
             )
         else:
@@ -256,9 +256,9 @@ class Counter(commands.Cog):
                 ephemeral=True
             )
     
-    @app_commands.command(name="voiceout", description="Leave voice channel")
-    async def voiceout_command(self, interaction: discord.Interaction):
-        """Voice Out Command - Leave voice channel"""
+    @app_commands.command(name="counterout", description="Leave voice channel")
+    async def counterout_command(self, interaction: discord.Interaction):
+        """Counter Out Command - Leave voice channel"""
         # Check permissions
         if interaction.guild_id not in GUILD_ALLOWLIST:
             await interaction.response.send_message(
