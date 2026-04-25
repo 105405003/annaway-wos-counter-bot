@@ -78,10 +78,11 @@ class RefillTimer(commands.Cog):
             return
         
         # Record the channel ID used for /refill in this Guild (supports Text and Voice channels)
+        # Timers will be created in this channel
         if isinstance(interaction.channel, (discord.TextChannel, discord.VoiceChannel)):
             self.last_refill_channel_ids[interaction.guild_id] = interaction.channel.id
             channel_type = "Voice Channel" if isinstance(interaction.channel, discord.VoiceChannel) else "Text Channel"
-            logger.info(f"✅ Recorded timer channel for Guild {interaction.guild.name}: {interaction.channel.name} ({channel_type}, ID: {interaction.channel.id})")
+            logger.info(f"✅ Timers will be created in: {interaction.channel.name} ({channel_type}, ID: {interaction.channel.id})")
         
         # Get currently active timers
         guild_sessions = self.session_manager.get_guild_sessions(interaction.guild_id)
@@ -134,7 +135,7 @@ class RefillTimer(commands.Cog):
             logger.error(f"❌ Guild not found: {guild_id}")
             return None
         
-        # Prioritize the recorded channel (last channel where /refill was used)
+        # Use the last channel where /refill was used (no restrictions)
         channel = None
         last_channel_id = self.last_refill_channel_ids.get(guild_id)
         
@@ -143,18 +144,23 @@ class RefillTimer(commands.Cog):
             # Support Text and Voice channels
             if channel and isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
                 channel_type = "Voice Channel" if isinstance(channel, discord.VoiceChannel) else "Text Channel"
-                logger.info(f"✅ Using recorded channel: {channel.name} ({channel_type}, ID: {channel.id})")
+                logger.info(f"✅ Using channel where /refill was last used: {channel.name} ({channel_type}, ID: {channel.id})")
             else:
-                logger.warning(f"⚠️ Recorded channel ID {last_channel_id} invalid, using default channel")
+                logger.warning(f"⚠️ Last used channel ID {last_channel_id} invalid, searching for available channel")
                 channel = None
         
         if not channel:
-            # If no record, use default channel
-            logger.info(f"📝 No recorded channel, using default")
-            channel = await self.get_target_channel(guild)
+            # If no record, find any available channel with send permission
+            logger.info(f"📝 No recorded channel, finding available channel")
+            for ch in guild.channels:
+                if isinstance(ch, (discord.TextChannel, discord.VoiceChannel)):
+                    if ch.permissions_for(guild.me).send_messages:
+                        channel = ch
+                        logger.info(f"✅ Found available channel: {ch.name}")
+                        break
         
         if not channel:
-            logger.error(f"❌ Target channel not found: {guild_id}")
+            logger.error(f"❌ No available channel found in guild: {guild_id}")
             return None
         
         logger.info(f"🎯 Creating timer card in channel #{channel.name}")
