@@ -177,7 +177,7 @@ class Counter(commands.Cog):
         """Start Counting"""
         guild_id = interaction.guild_id
         
-        # Check for active session
+        # Check for active session (thread-safe check)
         existing_session = self.session_manager.get_session(guild_id)
         
         if existing_session and existing_session.is_running:
@@ -185,10 +185,27 @@ class Counter(commands.Cog):
             await interaction.followup.send("⚠️ A counting session is already in progress!", ephemeral=True)
             return
         
-        # If old session exists (waiting for cleanup), cancel cleanup
+        # If old session exists (waiting for cleanup), forcefully clean it up
         if existing_session:
+            # Cancel any pending tasks
             existing_session.cancel_delete_task()
-            existing_session.messages_to_delete.clear()
+            if existing_session.task and not existing_session.task.done():
+                existing_session.task.cancel()
+                try:
+                    await existing_session.task
+                except asyncio.CancelledError:
+                    pass
+            
+            # Disconnect old voice client
+            if existing_session.voice_client and existing_session.voice_client.is_connected():
+                try:
+                    await existing_session.voice_client.disconnect()
+                except:
+                    pass
+            
+            # Clear old session completely
+            self.session_manager.cancel_session(guild_id)
+            await asyncio.sleep(0.3)  # Brief pause for cleanup
             
         # Check if user is in VC
         if not interaction.user.voice or not interaction.user.voice.channel:
@@ -198,13 +215,15 @@ class Counter(commands.Cog):
         voice_channel = interaction.user.voice.channel
         
         try:
-            # Check if already in VC
+            # Double-check guild voice client
             existing_voice_client = interaction.guild.voice_client
             
             if existing_voice_client:
-                # Disconnect first
-                await existing_voice_client.disconnect()
-                await asyncio.sleep(0.5)
+                try:
+                    await existing_voice_client.disconnect()
+                    await asyncio.sleep(0.3)
+                except:
+                    pass
             
             # Connect to VC
             voice_client = await voice_channel.connect()
@@ -218,9 +237,9 @@ class Counter(commands.Cog):
                 )
             )
             
-            # Create session
+            # Create session and IMMEDIATELY set is_running = True (prevent race condition)
             session = self.session_manager.create_session(guild_id, voice_client, message)
-            session.is_running = True
+            session.is_running = True  # Set IMMEDIATELY to prevent double-start
             
             # Send start message
             start_msg = await interaction.followup.send("✅ Started Counting!", ephemeral=False, wait=True)
@@ -232,6 +251,8 @@ class Counter(commands.Cog):
             
         except Exception as e:
             await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
+            # Clean up failed session
+            self.session_manager.cancel_session(guild_id)
             
     async def stop_counting(self, interaction: discord.Interaction):
         """Stop Counting"""
@@ -240,6 +261,11 @@ class Counter(commands.Cog):
         
         if not session or not session.is_running:
             await interaction.followup.send("⚠️ No active counting session!", ephemeral=True)
+            return
+        
+        # Check if already stop requested (prevent double-stop)
+        if session.stop_requested:
+            await interaction.followup.send("⚠️ Stop already requested!", ephemeral=True)
             return
             
         session.request_stop()
@@ -315,25 +341,46 @@ class Counter(commands.Cog):
             print("🔴 Counting task cancelled")
         except Exception as e:
             print(f"❌ Counting loop error: {e}")
-            await session.message.edit(
-                embed=discord.Embed(
-                    title="❌ Error Occurred",
-                    description=f"```{str(e)}```",
-                    color=0xF44336
+            try:
+                await session.message.edit(
+                    embed=discord.Embed(
+                        title="❌ Error Occurred",
+                        description=f"```{str(e)}```",
+                        color=0xF44336
+                    )
                 )
-            )
+            except:
+                pass
         finally:
-            # Cleanup
+            # Cleanup (with safeguards)
             session.is_running = False
+            
+            # Check if this session is still the active one (not replaced by a new session)
+            current_session = self.session_manager.get_session(guild_id)
+            if current_session and current_session != session:
+                # A new session has started, don't clean up
+                print(f"⚠️ New session detected, skipping cleanup for old session")
+                return
             
             # Wait 15s before leaving VC
             await asyncio.sleep(15)
             
+            # Double-check before disconnecting
+            current_session = self.session_manager.get_session(guild_id)
+            if current_session and current_session != session:
+                # New session started during sleep, don't disconnect
+                print(f"⚠️ New session started, skipping VC disconnect")
+                return
+            
             if session.voice_client and session.voice_client.is_connected():
-                await session.voice_client.disconnect()
+                try:
+                    await session.voice_client.disconnect()
+                except:
+                    pass
                 
-            # Remove session
-            self.session_manager.cancel_session(session.guild_id)
+            # Remove session only if it's still the current one
+            if current_session == session:
+                self.session_manager.cancel_session(session.guild_id)
             
             print(f"✅ Session cleanup complete (Guild: {session.guild_id})")
 
