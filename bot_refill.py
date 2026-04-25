@@ -43,18 +43,32 @@ async def on_ready():
     logger.info(f'✅ Bot logged in as {bot.user}')
     logger.info(f'✅ Connected to {len(bot.guilds)} guilds')
     
-    # Sync Slash Commands (Guild-specific only, no global sync)
+    # Sync Slash Commands (Guild-specific only)
     try:
-        # Sync ONLY to guilds in allowlist (no global sync to avoid duplicates)
         logger.info(f'🔍 DEBUG: Total guilds: {len(bot.guilds)}')
+        
+        # Debug: Check commands in tree
+        global_commands = bot.tree.get_commands()
+        logger.info(f'🔍 DEBUG: Found {len(global_commands)} commands in bot.tree')
+        for cmd in global_commands:
+            logger.info(f'  - Command: {cmd.name}')
+        
+        # Debug: List guilds
         for guild in bot.guilds:
             logger.info(f'🔍 DEBUG: Guild "{guild.name}" (ID: {guild.id}), In allowlist: {guild.id in GUILD_ALLOWLIST}')
         
+        # Strategy: Clear guild commands first, then copy and sync
         for guild in bot.guilds:
             if guild.id in GUILD_ALLOWLIST:
                 logger.info(f'🔍 DEBUG: Starting guild sync for {guild.name} (ID: {guild.id})')
-                # Copy commands to this guild (but don't sync globally)
+                
+                # Clear existing guild commands
+                bot.tree.clear_commands(guild=discord.Object(id=guild.id))
+                
+                # Copy ALL commands from global tree to this guild
                 bot.tree.copy_global_to(guild=discord.Object(id=guild.id))
+                
+                # Sync to Discord
                 guild_synced = await bot.tree.sync(guild=discord.Object(id=guild.id))
                 logger.info(f'✅ Synced {len(guild_synced)} slash commands for guild {guild.name}')
             else:
