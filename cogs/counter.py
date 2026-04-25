@@ -6,10 +6,13 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import asyncio
+import logging
 from typing import Optional
 
 from utils import AudioPlayer, ImageStreamer, CountSessionManager
 from utils.config import GUILD_ALLOWLIST, COUNTER_ROLE_IDS, COUNTER_ROLE_NAME
+
+logger = logging.getLogger(__name__)
 
 class CounterView(discord.ui.View):
     """Counter Control Panel View"""
