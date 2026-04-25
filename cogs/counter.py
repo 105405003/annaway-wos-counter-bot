@@ -232,6 +232,9 @@ class Counter(commands.Cog):
             voice_client = None
             max_retries = 1
             
+            # Small delay to ensure Gateway is ready
+            await asyncio.sleep(0.5)
+            
             for attempt in range(max_retries):
                 try:
                     voice_client = await asyncio.wait_for(
@@ -260,6 +263,13 @@ class Counter(commands.Cog):
                             raise
                     else:
                         raise
+                except discord.errors.ConnectionClosed as e:
+                    # Handle 4017 and other WebSocket errors
+                    error_code = getattr(e, 'code', 'unknown')
+                    if error_code == 4017:
+                        raise Exception(f"Discord Voice Gateway error (4017). Please try:\n1. Wait 30 seconds and try again\n2. Or restart the bot with: sudo systemctl restart refill-bot-en")
+                    else:
+                        raise Exception(f"Voice connection closed (code {error_code})")
             
             if not voice_client:
                 raise Exception("Failed to connect to voice channel")
