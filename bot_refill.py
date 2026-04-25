@@ -53,6 +53,8 @@ async def on_ready():
         for guild in bot.guilds:
             if guild.id in GUILD_ALLOWLIST:
                 logger.info(f'🔍 DEBUG: Starting guild sync for {guild.name} (ID: {guild.id})')
+                # Copy commands to this guild (but don't sync globally)
+                bot.tree.copy_global_to(guild=discord.Object(id=guild.id))
                 guild_synced = await bot.tree.sync(guild=discord.Object(id=guild.id))
                 logger.info(f'✅ Synced {len(guild_synced)} slash commands for guild {guild.name}')
             else:
