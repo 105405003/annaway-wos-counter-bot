@@ -220,13 +220,46 @@ class Counter(commands.Cog):
             
             if existing_voice_client:
                 try:
-                    await existing_voice_client.disconnect()
-                    await asyncio.sleep(0.3)
+                    await existing_voice_client.disconnect(force=True)
+                    await asyncio.sleep(1.0)  # Longer wait for Discord to clean up
                 except:
                     pass
             
-            # Connect to VC
-            voice_client = await voice_channel.connect()
+            # Connect to VC with timeout and retry
+            voice_client = None
+            max_retries = 3
+            
+            for attempt in range(max_retries):
+                try:
+                    voice_client = await asyncio.wait_for(
+                        voice_channel.connect(reconnect=False),
+                        timeout=10.0
+                    )
+                    break
+                except asyncio.TimeoutError:
+                    if attempt < max_retries - 1:
+                        await interaction.followup.send(
+                            f"⚠️ Voice connection timeout, retrying... ({attempt + 1}/{max_retries})",
+                            ephemeral=True
+                        )
+                        await asyncio.sleep(2.0)
+                    else:
+                        raise Exception("Voice connection timeout after 3 attempts")
+                except discord.errors.ClientException as e:
+                    if "already connected" in str(e).lower():
+                        # Force disconnect and retry
+                        if interaction.guild.voice_client:
+                            await interaction.guild.voice_client.disconnect(force=True)
+                            await asyncio.sleep(1.5)
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2.0)
+                        else:
+                            raise
+                    else:
+                        raise
+            
+            if not voice_client:
+                raise Exception("Failed to connect to voice channel")
             
             # Create initial message
             message = await interaction.channel.send(
@@ -374,7 +407,8 @@ class Counter(commands.Cog):
             
             if session.voice_client and session.voice_client.is_connected():
                 try:
-                    await session.voice_client.disconnect()
+                    await session.voice_client.disconnect(force=True)
+                    await asyncio.sleep(0.5)  # Wait for disconnect to complete
                 except:
                     pass
                 
