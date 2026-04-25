@@ -190,16 +190,16 @@ class Counter(commands.Cog):
         else:
             await interaction.response.defer()
         
-        # Connect to voice channel with retry logic (same as /counter)
+        # Connect to voice channel with retry logic (faster for /counterin)
         voice_client = None
-        max_retries = 3
+        max_retries = 2
         
         for attempt in range(max_retries):
             try:
                 logger.info(f"🔊 Attempting voice connection (attempt {attempt + 1}/{max_retries})")
                 voice_client = await asyncio.wait_for(
                     voice_channel.connect(reconnect=True),
-                    timeout=20.0
+                    timeout=10.0
                 )
                 logger.info(f"✅ Voice connection successful")
                 break
@@ -207,11 +207,11 @@ class Counter(commands.Cog):
             except asyncio.TimeoutError:
                 logger.warning(f"⚠️  Voice connection timeout (attempt {attempt + 1}/{max_retries})")
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2.0)
+                    await asyncio.sleep(1.0)
                     continue
                 else:
                     await interaction.followup.send(
-                        "❌ Voice connection timeout after multiple attempts! Please try again.",
+                        "❌ Voice connection timeout! Please try again.\n💡 If this persists, use `/counter` instead (it will auto-connect).",
                         ephemeral=True
                     )
                     return
@@ -222,25 +222,25 @@ class Counter(commands.Cog):
                     if interaction.guild.voice_client:
                         try:
                             await interaction.guild.voice_client.disconnect(force=True)
-                            await asyncio.sleep(1.5)
+                            await asyncio.sleep(1.0)
                         except:
                             pass
                     if attempt < max_retries - 1:
                         continue
                 await interaction.followup.send(
-                    f"❌ Voice connection error: {e}",
+                    f"❌ Voice connection error: {e}\n💡 Try `/counter` instead.",
                     ephemeral=True
                 )
                 return
                 
             except Exception as e:
-                logger.error(f"❌ Voice connection failed: {e}")
+                logger.error(f"❌ Voice connection failed: {e}", exc_info=True)
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2.0)
+                    await asyncio.sleep(1.0)
                     continue
                 else:
                     await interaction.followup.send(
-                        f"❌ Failed to join voice channel after {max_retries} attempts: {e}",
+                        f"❌ Failed to join voice channel: {str(e)[:100]}\n💡 Try `/counter` instead.",
                         ephemeral=True
                     )
                     return
