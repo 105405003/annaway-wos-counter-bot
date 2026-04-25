@@ -43,23 +43,16 @@ async def on_ready():
     logger.info(f'✅ Bot logged in as {bot.user}')
     logger.info(f'✅ Connected to {len(bot.guilds)} guilds')
     
-    # Sync Slash Commands (Guild specific for immediate update)
+    # Sync Slash Commands (Guild-specific only, no global sync)
     try:
-        # First sync globally to ensure commands are registered
-        global_synced = await bot.tree.sync()
-        logger.info(f'✅ Synced {len(global_synced)} slash commands globally')
-        
-        # Debug: List all guilds
+        # Sync ONLY to guilds in allowlist (no global sync to avoid duplicates)
         logger.info(f'🔍 DEBUG: Total guilds: {len(bot.guilds)}')
         for guild in bot.guilds:
             logger.info(f'🔍 DEBUG: Guild "{guild.name}" (ID: {guild.id}), In allowlist: {guild.id in GUILD_ALLOWLIST}')
         
-        # Then sync to specific guilds in allowlist for immediate availability
         for guild in bot.guilds:
             if guild.id in GUILD_ALLOWLIST:
                 logger.info(f'🔍 DEBUG: Starting guild sync for {guild.name} (ID: {guild.id})')
-                # 先把全域指令複製到這個 guild，指令才會立即顯示
-                bot.tree.copy_global_to(guild=discord.Object(id=guild.id))
                 guild_synced = await bot.tree.sync(guild=discord.Object(id=guild.id))
                 logger.info(f'✅ Synced {len(guild_synced)} slash commands for guild {guild.name}')
             else:
