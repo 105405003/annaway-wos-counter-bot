@@ -124,6 +124,157 @@ class Counter(commands.Cog):
             except Exception as e:
                 logger.error(f"❌ Failed to delete message ({message.id}): {e}")
         
+    @app_commands.command(name="voicein", description="Join voice channel and stay connected")
+    async def voicein_command(self, interaction: discord.Interaction):
+        """Voice In Command - Join and stay in voice channel"""
+        # Check permissions
+        if interaction.guild_id not in GUILD_ALLOWLIST:
+            await interaction.response.send_message(
+                "❌ This bot is not configured for this server.",
+                ephemeral=True
+            )
+            return
+
+        role_id = COUNTER_ROLE_IDS.get(interaction.guild_id)
+        required_role = None
+        if role_id:
+            required_role = interaction.guild.get_role(role_id)
+            
+        if required_role is None:
+            required_role = next(
+                (r for r in interaction.guild.roles if r.name == COUNTER_ROLE_NAME),
+                None
+            )
+            
+        if required_role is None:
+            await interaction.response.send_message(
+                "❌ Error: Required role not found!\nPlease ask an admin to check role settings.",
+                ephemeral=True
+            )
+            return
+
+        if required_role not in interaction.user.roles and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "❌ You don't have permission!\nRequires `Annaway_Counter` role to operate.",
+                ephemeral=True
+            )
+            return
+        
+        # Check if user is in VC
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            await interaction.response.send_message(
+                "❌ Please join a Voice Channel first!",
+                ephemeral=True
+            )
+            return
+        
+        voice_channel = interaction.user.voice.channel
+        
+        # Check if already connected
+        if interaction.guild.voice_client and interaction.guild.voice_client.is_connected():
+            current_channel = interaction.guild.voice_client.channel
+            if current_channel == voice_channel:
+                await interaction.response.send_message(
+                    f"✅ Already connected to **{voice_channel.name}**!",
+                    ephemeral=True
+                )
+                return
+            else:
+                # Connected to different channel, move
+                await interaction.response.defer()
+                try:
+                    await interaction.guild.voice_client.disconnect(force=True)
+                    await asyncio.sleep(1.0)
+                except:
+                    pass
+        else:
+            await interaction.response.defer()
+        
+        # Connect to voice channel
+        try:
+            voice_client = await asyncio.wait_for(
+                voice_channel.connect(reconnect=False),
+                timeout=10.0
+            )
+            
+            await interaction.followup.send(
+                f"🎤 Joined **{voice_channel.name}**!\nUse `/voiceout` to disconnect.",
+                ephemeral=False
+            )
+            
+        except asyncio.TimeoutError:
+            await interaction.followup.send(
+                "❌ Voice connection timeout! Please try again.",
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Failed to join voice channel: {e}",
+                ephemeral=True
+            )
+    
+    @app_commands.command(name="voiceout", description="Leave voice channel")
+    async def voiceout_command(self, interaction: discord.Interaction):
+        """Voice Out Command - Leave voice channel"""
+        # Check permissions
+        if interaction.guild_id not in GUILD_ALLOWLIST:
+            await interaction.response.send_message(
+                "❌ This bot is not configured for this server.",
+                ephemeral=True
+            )
+            return
+
+        role_id = COUNTER_ROLE_IDS.get(interaction.guild_id)
+        required_role = None
+        if role_id:
+            required_role = interaction.guild.get_role(role_id)
+            
+        if required_role is None:
+            required_role = next(
+                (r for r in interaction.guild.roles if r.name == COUNTER_ROLE_NAME),
+                None
+            )
+            
+        if required_role is None:
+            await interaction.response.send_message(
+                "❌ Error: Required role not found!\nPlease ask an admin to check role settings.",
+                ephemeral=True
+            )
+            return
+
+        if required_role not in interaction.user.roles and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "❌ You don't have permission!\nRequires `Annaway_Counter` role to operate.",
+                ephemeral=True
+            )
+            return
+        
+        # Check if connected
+        voice_client = interaction.guild.voice_client
+        
+        if not voice_client or not voice_client.is_connected():
+            await interaction.response.send_message(
+                "⚠️ Bot is not in a voice channel!",
+                ephemeral=True
+            )
+            return
+        
+        channel_name = voice_client.channel.name
+        
+        await interaction.response.defer()
+        
+        try:
+            await voice_client.disconnect(force=True)
+            await interaction.followup.send(
+                f"👋 Left **{channel_name}**!",
+                ephemeral=False
+            )
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Failed to disconnect: {e}",
+                ephemeral=True
+            )
+    
     @app_commands.command(name="counter", description="Start the counting bot")
     async def counter_command(self, interaction: discord.Interaction):
         """Counter Command"""
