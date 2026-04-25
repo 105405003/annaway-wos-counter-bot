@@ -383,8 +383,8 @@ class Counter(commands.Cog):
             for attempt in range(max_retries):
                 try:
                     voice_client = await asyncio.wait_for(
-                        voice_channel.connect(reconnect=False),
-                        timeout=10.0
+                        voice_channel.connect(reconnect=True),
+                        timeout=20.0
                     )
                     break
                 except asyncio.TimeoutError:
