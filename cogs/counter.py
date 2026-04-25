@@ -228,15 +228,15 @@ class Counter(commands.Cog):
                 except:
                     pass
             
-            # Connect to VC with timeout and retry
+            # Connect to VC with single attempt (disable auto-reconnect)
             voice_client = None
-            max_retries = 3
+            max_retries = 1
             
             for attempt in range(max_retries):
                 try:
                     voice_client = await asyncio.wait_for(
-                        voice_channel.connect(reconnect=True),
-                        timeout=20.0
+                        voice_channel.connect(reconnect=False),
+                        timeout=8.0
                     )
                     break
                 except asyncio.TimeoutError:
